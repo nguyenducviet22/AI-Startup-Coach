@@ -1,0 +1,27 @@
+{
+    "hooks": {
+        "PreToolUse": [
+            {
+                "matcher": ".*",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "node \"$(git rev-parse --show-toplevel)/.codex/kit-hooks/guard-rails.mjs\" --platform codex",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ],
+        "UserPromptSubmit": [
+            {
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "node \"$(git rev-parse --show-toplevel)/.codex/kit-hooks/dev-rules-reminder.mjs\"",
+                        "timeout": 10
+                    }
+                ]
+            }
+        ]
+    }
+}

@@ -1,0 +1,2 @@
+"""Coaching Harness backend package."""
+
