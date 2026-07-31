@@ -53,6 +53,7 @@ async def test_openrouter_client_sends_configured_model_messages_and_tools() -> 
         {
             "model": "configured-model",
             "messages": [{"role": "user", "content": "hello"}],
+            "max_tokens": 1024,
             "tools": [{"type": "function", "function": {"name": "check_stage_readiness"}}],
         }
     ]

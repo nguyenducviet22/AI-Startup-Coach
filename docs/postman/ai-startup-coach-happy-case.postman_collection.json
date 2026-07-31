@@ -1,0 +1,729 @@
+{
+  "info": {
+    "name": "AI Startup Coach - Happy Case",
+    "_postman_id": "3d8a1c7a-1ce1-44bc-9c72-7cf9fb61a501",
+    "description": "Happy-path requests for local AI Startup Coach API. Run requests in order from top to bottom.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "userName",
+      "value": "Postman Test User"
+    },
+    {
+      "key": "userEmail",
+      "value": "test@example.com"
+    },
+    {
+      "key": "userPassword",
+      "value": "Password123!"
+    },
+    {
+      "key": "startupName",
+      "value": "Virtual Small-talk Mate"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "startupId",
+      "value": ""
+    },
+    {
+      "key": "sessionId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/health",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('health is ok', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json()).to.deep.equal({ status: 'ok' });",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Signup",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{userName}}\",\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/signup",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "signup"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('signup returns tokens', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.user.email).to.eql(pm.variables.replaceIn('{{userEmail}}'));",
+              "  pm.expect(json.access_token).to.be.a('string').and.not.empty;",
+              "  pm.expect(json.refresh_token).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('accessToken', json.access_token);",
+              "  pm.collectionVariables.set('refreshToken', json.refresh_token);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/login",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('login refreshes tokens', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set('accessToken', json.access_token);",
+              "  pm.collectionVariables.set('refreshToken', json.refresh_token);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 Create Startup",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"{{startupName}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/startups",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('startup created in idea stage', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.id).to.be.a('string').and.not.empty;",
+              "  pm.expect(json.current_stage).to.eql('idea');",
+              "  pm.collectionVariables.set('startupId', json.id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 List Startups",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/startups",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('startup list includes created startup', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  const startupId = pm.collectionVariables.get('startupId');",
+              "  pm.expect(json.startups.some((startup) => startup.id === startupId)).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "05 Get Startup",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/startups/{{startupId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups",
+            "{{startupId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('startup can be loaded', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.id).to.eql(pm.collectionVariables.get('startupId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "06 Chat In Idea Stage",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"My startup idea is Virtual Small-talk Mate: an AI practice companion that helps shy students and young professionals get better at everyday small talk. The problem is they feel awkward starting conversations and do not have a safe place to practice; the target customer is socially anxious students and early-career professionals; the rough solution is simulated conversations, suggested replies, and instant feedback on tone and confidence.\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/startups/{{startupId}}/chat",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups",
+            "{{startupId}}",
+            "chat"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('chat returns assistant response', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.session_id).to.be.a('string').and.not.empty;",
+              "  pm.expect(json.message).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('sessionId', json.session_id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "07 Get Chat Messages",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/startups/{{startupId}}/chat/messages?session_id={{sessionId}}&limit=50",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups",
+            "{{startupId}}",
+            "chat",
+            "messages"
+          ],
+          "query": [
+            {
+              "key": "session_id",
+              "value": "{{sessionId}}"
+            },
+            {
+              "key": "limit",
+              "value": "50"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('chat messages are visible', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.session_id).to.eql(pm.collectionVariables.get('sessionId'));",
+              "  pm.expect(json.messages.length).to.be.greaterThan(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "08 Advance To Lean Canvas",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/startups/{{startupId}}/advance-stage",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups",
+            "{{startupId}}",
+            "advance-stage"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('startup advances to lean canvas', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().current_stage).to.eql('lean_canvas');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "09 Chat Draft Lean Canvas",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"message\": \"Draft the Lean Canvas for Virtual Small-talk Mate. Use these details: problem: shy students and young professionals feel awkward starting casual conversations and lack a safe practice space; solution: AI role-play conversations, suggested replies, and instant feedback on tone and confidence; unique value proposition: a private small-talk practice partner available anytime; customer segments: socially anxious students and early-career professionals; channels: university communities, career centers, TikTok content, and mental wellness communities; revenue streams: freemium app with a monthly subscription for advanced scenarios and feedback.\",\n  \"session_id\": \"{{sessionId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/startups/{{startupId}}/chat",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups",
+            "{{startupId}}",
+            "chat"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('lean canvas chat succeeds', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.message).to.be.a('string').and.not.empty;",
+              "  pm.collectionVariables.set('sessionId', json.session_id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10 Get Lean Canvas",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/startups/{{startupId}}/documents/lean_canvas",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups",
+            "{{startupId}}",
+            "documents",
+            "lean_canvas"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('lean canvas document exists', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.doc_type).to.eql('lean_canvas');",
+              "  pm.expect(json.version).to.be.greaterThan(0);",
+              "  pm.expect(json.content.problem).to.be.a('string').and.not.empty;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "11 Get Lean Canvas History",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/startups/{{startupId}}/documents/lean_canvas/history",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups",
+            "{{startupId}}",
+            "documents",
+            "lean_canvas",
+            "history"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('lean canvas history has at least one document', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.documents.length).to.be.greaterThan(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "12 Set Stage To BMC",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{accessToken}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"stage\": \"bmc\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/startups/{{startupId}}/stage",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "startups",
+            "{{startupId}}",
+            "stage"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('startup stage is bmc', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().current_stage).to.eql('bmc');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "13 Refresh Token",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/refresh",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "refresh"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('refresh returns replacement token bundle', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set('accessToken', json.access_token);",
+              "  pm.collectionVariables.set('refreshToken', json.refresh_token);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "14 Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refreshToken}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/auth/logout",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "auth",
+            "logout"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('logout revokes refresh token', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().revoked).to.eql(true);",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

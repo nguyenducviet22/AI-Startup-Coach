@@ -62,6 +62,7 @@ class OpenRouterChatClient:
         request: dict[str, Any] = {
             "model": model or self.model,
             "messages": messages,
+            "max_tokens": self.settings.openrouter_max_tokens,
         }
         if tools is not None:
             request["tools"] = tools

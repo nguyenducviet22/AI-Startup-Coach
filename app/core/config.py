@@ -23,6 +23,7 @@ class Settings(BaseSettings):
         default="replace-with-openrouter-model-slug",
         alias="OPENROUTER_MODEL",
     )
+    openrouter_max_tokens: int = Field(default=1024, alias="OPENROUTER_MAX_TOKENS")
     openrouter_http_referer: str = Field(
         default="http://localhost:8000",
         alias="OPENROUTER_HTTP_REFERER",
