@@ -70,6 +70,35 @@ class ChatService:
         await self.session.refresh(new_session)
         return new_session
 
+    async def get_session(
+        self,
+        *,
+        startup_id: uuid.UUID | str,
+        session_id: uuid.UUID | str | None = None,
+    ) -> ChatSession | None:
+        startup_uuid = _coerce_uuid(startup_id)
+        session_uuid = _coerce_uuid(session_id) if session_id is not None else None
+
+        if session_uuid is not None:
+            result = await self.session.execute(
+                select(ChatSession).where(
+                    ChatSession.id == session_uuid,
+                    ChatSession.startup_id == startup_uuid,
+                )
+            )
+            existing = result.scalar_one_or_none()
+            if existing is None:
+                raise ChatSessionNotFoundError(session_uuid, startup_uuid)
+            return existing
+
+        result = await self.session.execute(
+            select(ChatSession)
+            .where(ChatSession.startup_id == startup_uuid)
+            .order_by(desc(ChatSession.sequence))
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
+
     async def save_message(
         self,
         *,
@@ -107,11 +136,43 @@ class ChatService:
         rows = list(reversed(result.scalars().all()))
         return [_message_to_context(row) for row in rows]
 
+    async def get_display_messages(
+        self,
+        *,
+        session_id: uuid.UUID | str,
+        limit: int,
+        before_sequence: int | None = None,
+    ) -> list[dict[str, Any]]:
+        filters = [
+            ChatMessage.session_id == _coerce_uuid(session_id),
+            ChatMessage.role.in_(("user", "assistant")),
+        ]
+        if before_sequence is not None:
+            filters.append(ChatMessage.sequence < before_sequence)
+
+        result = await self.session.execute(
+            select(ChatMessage)
+            .where(*filters)
+            .order_by(desc(ChatMessage.sequence))
+            .limit(limit)
+        )
+        rows = list(reversed(result.scalars().all()))
+        return [_message_to_display(row) for row in rows]
+
 
 def _message_to_context(message: ChatMessage) -> dict[str, Any]:
     return {
         "role": message.role,
         "content": message.content,
+    }
+
+
+def _message_to_display(message: ChatMessage) -> dict[str, Any]:
+    return {
+        "role": message.role,
+        "content": message.content,
+        "created_at": message.created_at.isoformat() if message.created_at else None,
+        "sequence": message.sequence,
     }
 
 

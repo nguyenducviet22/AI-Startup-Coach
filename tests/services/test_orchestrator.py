@@ -141,6 +141,143 @@ async def test_orchestrator_processes_multiple_tool_calls_before_final_response(
     assert tool_result_messages == second_call_messages[-2:]
 
 
+async def test_orchestrator_exposes_stage_readiness_from_tool_result() -> None:
+    client = FakeChatClient(
+        [
+            _response(
+                None,
+                tool_calls=[
+                    _tool_call(
+                        "call-readiness",
+                        "check_stage_readiness",
+                        {"current_stage": "idea", "ready": True, "missing_fields": []},
+                    ),
+                ],
+            ),
+            _response("You have enough to move forward. Shall we advance?"),
+        ]
+    )
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
+
+    result = await orchestrator.handle_turn(
+        startup=StartupContext("startup-1", "user-1", "idea"),
+        history=[],
+        user_message="Is this enough?",
+    )
+
+    assert result.content == "You have enough to move forward. Shall we advance?"
+    assert result.stage_readiness == {"ready": True, "missing_fields": []}
+
+
+async def test_orchestrator_ignores_invalid_stage_readiness_tool_result() -> None:
+    client = FakeChatClient(
+        [
+            _response(
+                None,
+                tool_calls=[
+                    _tool_call(
+                        "call-readiness",
+                        "check_stage_readiness",
+                        {"current_stage": "not-a-stage", "ready": True, "missing_fields": []},
+                    ),
+                ],
+            ),
+            _response("I need to re-check the stage details."),
+        ]
+    )
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
+
+    result = await orchestrator.handle_turn(
+        startup=StartupContext("startup-1", "user-1", "idea"),
+        history=[],
+        user_message="Is this enough?",
+    )
+
+    assert result.content == "I need to re-check the stage details."
+    assert result.stage_readiness is None
+    payload = json.loads(client.requests[1]["messages"][-1]["content"])
+    assert payload["ok"] is False
+
+
+async def test_orchestrator_uses_last_stage_readiness_tool_result() -> None:
+    client = FakeChatClient(
+        [
+            _response(
+                None,
+                tool_calls=[
+                    _tool_call(
+                        "call-readiness-first",
+                        "check_stage_readiness",
+                        {
+                            "current_stage": "lean_canvas",
+                            "ready": False,
+                            "missing_fields": ["channels"],
+                        },
+                    ),
+                    _tool_call(
+                        "call-canvas",
+                        "generate_lean_canvas",
+                        {
+                            "problem": "Tutors lose time coordinating lessons.",
+                            "solution": "Scheduling automation.",
+                            "unique_value_proposition": "Calendar ops for tutoring teams.",
+                            "customer_segments": "Independent tutoring centers.",
+                            "channels": "Tutor communities.",
+                        },
+                    ),
+                    _tool_call(
+                        "call-readiness-last",
+                        "check_stage_readiness",
+                        {"current_stage": "lean_canvas", "ready": True, "missing_fields": []},
+                    ),
+                ],
+            ),
+            _response("I updated the canvas and it is ready."),
+        ]
+    )
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
+
+    result = await orchestrator.handle_turn(
+        startup=StartupContext("startup-1", "user-1", "lean_canvas"),
+        history=[],
+        user_message="Update and check readiness.",
+    )
+
+    assert result.stage_readiness == {"ready": True, "missing_fields": []}
+
+
+async def test_orchestrator_returns_no_stage_readiness_for_non_readiness_tool_call() -> None:
+    client = FakeChatClient(
+        [
+            _response(
+                None,
+                tool_calls=[
+                    _tool_call(
+                        "call-canvas",
+                        "generate_lean_canvas",
+                        {
+                            "problem": "Tutors lose time coordinating lessons.",
+                            "solution": "Scheduling automation.",
+                            "unique_value_proposition": "Calendar ops for tutoring teams.",
+                            "customer_segments": "Independent tutoring centers.",
+                        },
+                    ),
+                ],
+            ),
+            _response("I drafted the canvas."),
+        ]
+    )
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
+
+    result = await orchestrator.handle_turn(
+        startup=StartupContext("startup-1", "user-1", "lean_canvas"),
+        history=[],
+        user_message="Draft the canvas.",
+    )
+
+    assert result.stage_readiness is None
+
+
 async def test_orchestrator_returns_tool_validation_error_to_model_for_self_correction() -> None:
     client = FakeChatClient(
         [

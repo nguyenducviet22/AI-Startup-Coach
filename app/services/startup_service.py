@@ -56,6 +56,15 @@ class StartupService:
     async def get_startup_data(self, startup_id: uuid.UUID | str) -> dict[str, Any]:
         return startup_to_dict(await self.get_startup(startup_id))
 
+    async def list_startups_for_user(self, user_id: uuid.UUID | str) -> list[dict[str, Any]]:
+        user_uuid = _coerce_uuid(user_id)
+        result = await self.session.execute(
+            select(Startup)
+            .where(Startup.user_id == user_uuid)
+            .order_by(Startup.created_at.desc(), Startup.id.desc())
+        )
+        return [startup_to_dict(startup) for startup in result.scalars().all()]
+
 
 def startup_to_dict(startup: Startup) -> dict[str, Any]:
     return {

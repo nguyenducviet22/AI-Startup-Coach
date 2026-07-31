@@ -1,4 +1,4 @@
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
@@ -26,6 +26,10 @@ class StartupResponse(BaseModel):
     updated_at: str | None
 
 
+class StartupListResponse(BaseModel):
+    startups: list[StartupResponse]
+
+
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -33,9 +37,27 @@ class ChatRequest(BaseModel):
     session_id: UUID | None = None
 
 
+class StageReadinessResponse(BaseModel):
+    ready: bool
+    missing_fields: list[str]
+
+
 class ChatResponse(BaseModel):
     session_id: UUID
     message: str
+    stage_readiness: StageReadinessResponse | None = None
+
+
+class ChatMessageResponse(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+    created_at: str | None
+    sequence: int
+
+
+class ChatMessagesResponse(BaseModel):
+    session_id: UUID | None
+    messages: list[ChatMessageResponse]
 
 
 class AuthSignupRequest(BaseModel):

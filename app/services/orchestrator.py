@@ -13,6 +13,7 @@ from app.services.tool_dispatcher import ToolDispatcher
 @dataclass(frozen=True)
 class OrchestratorResult:
     content: str
+    stage_readiness: dict[str, Any] | None
     tool_messages: list[dict[str, Any]]
     tool_call_data: list[dict[str, Any]]
 
@@ -97,12 +98,14 @@ class AgentOrchestrator:
 
             return OrchestratorResult(
                 content=_message_content(assistant_message) or "",
+                stage_readiness=_stage_readiness_from_tool_data(tool_call_data),
                 tool_messages=tool_messages,
                 tool_call_data=tool_call_data,
             )
         except LLMProviderError as exc:
             return OrchestratorResult(
                 content=exc.student_message,
+                stage_readiness=None,
                 tool_messages=[],
                 tool_call_data=[],
             )
@@ -152,3 +155,30 @@ def _get(value: Any, key: str) -> Any:
     if isinstance(value, dict):
         return value[key]
     return getattr(value, key)
+
+
+def _stage_readiness_from_tool_data(tool_call_data: list[dict[str, Any]]) -> dict[str, Any] | None:
+    for entry in reversed(tool_call_data):
+        if entry.get("tool_name") != "check_stage_readiness":
+            continue
+
+        result = entry.get("result")
+        if not isinstance(result, dict) or result.get("ok") is not True:
+            return None
+
+        arguments = result.get("arguments")
+        if not isinstance(arguments, dict) or not isinstance(arguments.get("ready"), bool):
+            return None
+
+        missing_fields = arguments.get("missing_fields", [])
+        if not isinstance(missing_fields, list) or not all(
+            isinstance(field, str) for field in missing_fields
+        ):
+            return None
+
+        return {
+            "ready": arguments["ready"],
+            "missing_fields": missing_fields,
+        }
+
+    return None

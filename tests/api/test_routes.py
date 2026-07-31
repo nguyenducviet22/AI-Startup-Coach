@@ -18,7 +18,7 @@ from app.core.security import create_access_token
 from app.db.session import get_db_session
 from app.main import app
 from app.models.base import Base
-from app.models.chat import ChatMessage
+from app.models.chat import ChatMessage, ChatSession
 from app.models.startup import Startup
 from app.models.user import User
 
@@ -128,6 +128,70 @@ async def test_create_startup_derives_user_id_from_verified_token(
     assert response.json()["user_id"] == str(user_id)
 
 
+async def test_list_startups_returns_only_current_users_startups(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    other_user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    own_startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+    other_startup_id = await _create_startup(
+        session_factory,
+        other_user_id,
+        name="Other user's startup",
+    )
+
+    response = await client.get("/startups", headers=headers)
+
+    assert response.status_code == 200
+    startups = response.json()["startups"]
+    assert [startup["id"] for startup in startups] == [own_startup_id]
+    assert all(startup["user_id"] == str(user_id) for startup in startups)
+    assert str(other_startup_id) not in response.text
+    assert "Other user's startup" not in response.text
+
+
+async def test_list_startups_orders_newest_first_with_id_tiebreaker(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    tied_created_at = datetime(2026, 7, 31, 12, 0, tzinfo=UTC)
+    lower_id = uuid.UUID("00000000-0000-0000-0000-000000000001")
+    higher_id = uuid.UUID("ffffffff-ffff-ffff-ffff-ffffffffffff")
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                Startup(
+                    id=lower_id,
+                    user_id=user_id,
+                    name="Lower id",
+                    created_at=tied_created_at,
+                ),
+                Startup(
+                    id=higher_id,
+                    user_id=user_id,
+                    name="Higher id",
+                    created_at=tied_created_at,
+                ),
+            ]
+        )
+        await session.commit()
+
+    response = await client.get("/startups", headers=headers)
+
+    assert response.status_code == 200
+    assert [startup["id"] for startup in response.json()["startups"]] == [
+        str(higher_id),
+        str(lower_id),
+    ]
+
+
 async def test_existing_routes_reject_invalid_access_token(client: httpx.AsyncClient) -> None:
     response = await client.post(
         "/startups",
@@ -200,6 +264,7 @@ async def test_chat_route_persists_messages_and_document_with_mocked_llm(
     chat_payload = chat_response.json()
     assert chat_payload["message"] == "I drafted the lean canvas."
     assert chat_payload["session_id"]
+    assert chat_payload["stage_readiness"] is None
 
     document_response = await client.get(f"/startups/{startup_id}/documents/lean_canvas", headers=headers)
     assert document_response.status_code == 200
@@ -267,6 +332,208 @@ async def test_chat_route_reuses_latest_session_when_session_id_absent(
     assert second.json()["session_id"] == first.json()["session_id"]
 
 
+async def test_chat_route_returns_null_stage_readiness_for_invalid_readiness_tool_call(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+
+    client.fake_chat_client.responses = [
+        _response(
+            None,
+            tool_calls=[
+                _tool_call(
+                    "call-invalid-readiness",
+                    "check_stage_readiness",
+                    {
+                        "current_stage": "not-a-stage",
+                        "ready": True,
+                        "missing_fields": [],
+                    },
+                )
+            ],
+        ),
+        _response("I need to check that again."),
+    ]
+
+    response = await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "Are we ready?"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "I need to check that again."
+    assert response.json()["stage_readiness"] is None
+
+
+async def test_chat_messages_route_returns_latest_session_messages_without_tool_rows(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+    await client.post(f"/startups/{startup_id}/advance-stage", headers=headers)
+
+    client.fake_chat_client.responses = [
+        _response(
+            None,
+            tool_calls=[
+                _tool_call(
+                    "call-canvas",
+                    "generate_lean_canvas",
+                    {
+                        "problem": "Tutors lose time coordinating lessons.",
+                        "solution": "Scheduling automation.",
+                        "unique_value_proposition": "Calendar ops for tutoring teams.",
+                        "customer_segments": "Independent tutoring centers.",
+                    },
+                )
+            ],
+        ),
+        _response("I drafted the lean canvas."),
+    ]
+    chat_response = await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "Draft it."},
+        headers=headers,
+    )
+
+    response = await client.get(f"/startups/{startup_id}/chat/messages", headers=headers)
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["session_id"] == chat_response.json()["session_id"]
+    assert [(message["role"], message["content"]) for message in payload["messages"]] == [
+        ("user", "Draft it."),
+        ("assistant", "I drafted the lean canvas."),
+    ]
+    assert [message["sequence"] for message in payload["messages"]] == sorted(
+        message["sequence"] for message in payload["messages"]
+    )
+    assert all(message["created_at"] for message in payload["messages"])
+
+
+async def test_chat_messages_route_uses_explicit_session_id_and_paginates_by_sequence(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+    client.fake_chat_client.responses = [
+        _response("First reply."),
+        _response("Second reply."),
+        _response("Third reply."),
+    ]
+
+    first_chat = await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "First"},
+        headers=headers,
+    )
+    session_id = first_chat.json()["session_id"]
+    await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "Second", "session_id": session_id},
+        headers=headers,
+    )
+    await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "Third", "session_id": session_id},
+        headers=headers,
+    )
+
+    latest_page = (
+        await client.get(
+            f"/startups/{startup_id}/chat/messages",
+            params={"session_id": session_id, "limit": 2},
+            headers=headers,
+        )
+    ).json()["messages"]
+
+    assert [message["content"] for message in latest_page] == ["Third", "Third reply."]
+
+    older_page_response = await client.get(
+        f"/startups/{startup_id}/chat/messages",
+        params={
+            "session_id": session_id,
+            "limit": 2,
+            "before_sequence": latest_page[0]["sequence"],
+        },
+        headers=headers,
+    )
+
+    assert older_page_response.status_code == 200
+    assert [message["content"] for message in older_page_response.json()["messages"]] == [
+        "Second",
+        "Second reply.",
+    ]
+
+
+async def test_chat_messages_route_returns_empty_without_creating_session(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+
+    response = await client.get(f"/startups/{startup_id}/chat/messages", headers=headers)
+
+    assert response.status_code == 200
+    assert response.json() == {"session_id": None, "messages": []}
+    async with session_factory() as session:
+        session_count = (
+            await session.execute(
+                select(ChatSession).where(ChatSession.startup_id == uuid.UUID(startup_id))
+            )
+        ).scalars().all()
+    assert session_count == []
+
+
+async def test_chat_messages_route_rejects_session_id_from_different_startup(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    first_startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+    second_startup_id = (
+        await client.post("/startups", json={"name": "MarketOS"}, headers=headers)
+    ).json()["id"]
+    secret_message = "Sensitive message from the other startup."
+    client.fake_chat_client.responses = [_response(secret_message)]
+    other_chat = await client.post(
+        f"/startups/{second_startup_id}/chat",
+        json={"message": "Private second-startup context."},
+        headers=headers,
+    )
+
+    response = await client.get(
+        f"/startups/{first_startup_id}/chat/messages",
+        params={"session_id": other_chat.json()["session_id"]},
+        headers=headers,
+    )
+
+    assert response.status_code == 404
+    assert secret_message not in response.text
+    assert "Private second-startup context." not in response.text
+
+
 async def test_document_routes_reject_unknown_doc_type(
     client: httpx.AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],
@@ -287,8 +554,10 @@ async def test_document_routes_reject_unknown_doc_type(
     ("method", "path", "json_body"),
     [
         ("POST", "/startups", {"name": "TutorOS"}),
+        ("GET", "/startups", None),
         ("GET", "/startups/{startup_id}", None),
         ("POST", "/startups/{startup_id}/chat", {"message": "Hello"}),
+        ("GET", "/startups/{startup_id}/chat/messages", None),
         ("GET", "/startups/{startup_id}/documents/lean_canvas", None),
         ("GET", "/startups/{startup_id}/documents/lean_canvas/history", None),
         ("POST", "/startups/{startup_id}/advance-stage", None),
@@ -317,6 +586,7 @@ async def test_existing_routes_reject_unauthenticated_requests(
     [
         ("GET", "/startups/{startup_id}", None),
         ("POST", "/startups/{startup_id}/chat", {"message": "Hello"}),
+        ("GET", "/startups/{startup_id}/chat/messages", None),
         ("GET", "/startups/{startup_id}/documents/lean_canvas", None),
         ("GET", "/startups/{startup_id}/documents/lean_canvas/history", None),
         ("POST", "/startups/{startup_id}/advance-stage", None),
@@ -385,6 +655,7 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     )
 
     assert idea_chat.status_code == 200
+    assert idea_chat.json()["stage_readiness"] == {"ready": True, "missing_fields": []}
     assert (await client.get(f"/startups/{startup_id}", headers=headers)).json()["current_stage"] == "idea"
 
     advance_to_lean = await client.post(f"/startups/{startup_id}/advance-stage", headers=headers)
@@ -456,6 +727,7 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     )
 
     assert second_canvas_chat.status_code == 200
+    assert second_canvas_chat.json()["stage_readiness"] == {"ready": True, "missing_fields": []}
     assert (await client.get(f"/startups/{startup_id}", headers=headers)).json()["current_stage"] == "lean_canvas"
 
     canvas_history = (
@@ -518,9 +790,10 @@ async def _create_user(session_factory: async_sessionmaker[AsyncSession]) -> uui
 async def _create_startup(
     session_factory: async_sessionmaker[AsyncSession],
     user_id: uuid.UUID,
+    name: str = "TutorOS",
 ) -> uuid.UUID:
     async with session_factory() as session:
-        startup = Startup(user_id=user_id, name="TutorOS")
+        startup = Startup(user_id=user_id, name=name)
         session.add(startup)
         await session.commit()
         return startup.id

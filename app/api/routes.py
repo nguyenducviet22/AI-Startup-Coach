@@ -1,7 +1,7 @@
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_chat_client, get_current_user, require_startup_owner
@@ -13,11 +13,13 @@ from app.api.schemas import (
     AuthSignupRequest,
     AuthTokenResponse,
     ChatRequest,
+    ChatMessagesResponse,
     ChatResponse,
     CreateStartupRequest,
     DocumentHistoryResponse,
     DocumentResponse,
     SetStageRequest,
+    StartupListResponse,
     StartupResponse,
 )
 from app.core.config import Settings, get_settings
@@ -123,6 +125,15 @@ async def create_startup(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
+@router.get("/startups", response_model=StartupListResponse)
+async def list_startups(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    current_user: Annotated[User, Depends(get_current_user)],
+) -> dict[str, Any]:
+    startups = await StartupService(session).list_startups_for_user(current_user.id)
+    return {"startups": startups}
+
+
 @router.get("/startups/{startup_id}", response_model=StartupResponse)
 async def get_startup(
     startup: Annotated[Startup, Depends(require_startup_owner)],
@@ -198,7 +209,39 @@ async def chat(
     except ChatServiceError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
-    return {"session_id": chat_session.id, "message": result.content}
+    return {
+        "session_id": chat_session.id,
+        "message": result.content,
+        "stage_readiness": result.stage_readiness,
+    }
+
+
+@router.get("/startups/{startup_id}/chat/messages", response_model=ChatMessagesResponse)
+async def get_chat_messages(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    session_id: UUID | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+    before_sequence: Annotated[int | None, Query(ge=1)] = None,
+) -> dict[str, Any]:
+    chat_service = ChatService(session)
+    try:
+        chat_session = await chat_service.get_session(
+            startup_id=startup.id,
+            session_id=session_id,
+        )
+    except ChatServiceError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+    if chat_session is None:
+        return {"session_id": None, "messages": []}
+
+    messages = await chat_service.get_display_messages(
+        session_id=chat_session.id,
+        limit=limit,
+        before_sequence=before_sequence,
+    )
+    return {"session_id": chat_session.id, "messages": messages}
 
 
 @router.get("/startups/{startup_id}/documents/{doc_type}", response_model=DocumentResponse)
