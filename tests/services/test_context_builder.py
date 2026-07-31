@@ -107,4 +107,8 @@ def _settings(chat_history_limit: int) -> Settings:
         CHAT_HISTORY_LIMIT=chat_history_limit,
         LLM_MAX_RETRIES=2,
         LLM_RETRY_BACKOFF_SECONDS=0,
+        JWT_SECRET="context-test-secret-with-at-least-thirty-two-bytes",
+        JWT_ALGORITHM="HS256",
+        ACCESS_TOKEN_EXPIRE_MINUTES=30,
+        REFRESH_TOKEN_EXPIRE_DAYS=7,
     )

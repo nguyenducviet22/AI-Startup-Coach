@@ -1,6 +1,7 @@
 import json
 from typing import Any
 
+from app.core.config import Settings
 from app.llm.openrouter import LLMProviderError
 from app.services.context_builder import StartupContext
 from app.services.orchestrator import AgentOrchestrator
@@ -32,7 +33,7 @@ class FakeSkillLoader:
 
 async def test_orchestrator_calls_llm_with_stage_filtered_tools() -> None:
     client = FakeChatClient([_response("Ask one sharper customer question.")])
-    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader())
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
 
     result = await orchestrator.handle_message(
         startup=StartupContext("startup-1", "user-1", "idea", "TutorOS"),
@@ -69,7 +70,7 @@ async def test_orchestrator_handles_tool_calls_and_returns_final_response() -> N
             _response("I drafted the lean canvas fields from what you shared."),
         ]
     )
-    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader())
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
 
     result = await orchestrator.handle_message(
         startup=StartupContext("startup-1", "user-1", "lean_canvas", "TutorOS"),
@@ -114,7 +115,7 @@ async def test_orchestrator_processes_multiple_tool_calls_before_final_response(
             _response("I drafted the canvas and you have enough to confirm moving on."),
         ]
     )
-    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader())
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
 
     result = await orchestrator.handle_message(
         startup=StartupContext("startup-1", "user-1", "lean_canvas", "TutorOS"),
@@ -150,7 +151,7 @@ async def test_orchestrator_returns_tool_validation_error_to_model_for_self_corr
             _response("I need the missing SWOT fields before drafting."),
         ]
     )
-    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader())
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
 
     result = await orchestrator.handle_message(
         startup=StartupContext("startup-1", "user-1", "swot"),
@@ -181,7 +182,7 @@ async def test_orchestrator_does_not_advance_stage_when_readiness_is_true() -> N
         ]
     )
     startup = StartupContext("startup-1", "user-1", "idea")
-    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader())
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
 
     result = await orchestrator.handle_message(
         startup=startup,
@@ -205,7 +206,7 @@ async def test_orchestrator_returns_friendly_message_on_llm_provider_error() -> 
             )
         ]
     )
-    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader())
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
 
     result = await orchestrator.handle_message(
         startup=StartupContext("startup-1", "user-1", "idea"),
@@ -239,3 +240,21 @@ def _tool_call(call_id: str, name: str, arguments: dict[str, Any]) -> dict[str, 
             "arguments": json.dumps(arguments),
         },
     }
+
+
+def _settings() -> Settings:
+    return Settings(
+        DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/coaching",
+        OPENROUTER_API_KEY="test-key",
+        OPENROUTER_BASE_URL="https://openrouter.test/api/v1",
+        OPENROUTER_MODEL="test-model",
+        OPENROUTER_HTTP_REFERER="http://localhost:8000",
+        OPENROUTER_X_TITLE="AI Startup Coach",
+        CHAT_HISTORY_LIMIT=20,
+        LLM_MAX_RETRIES=2,
+        LLM_RETRY_BACKOFF_SECONDS=0,
+        JWT_SECRET="orchestrator-test-secret-with-at-least-thirty-two-bytes",
+        JWT_ALGORITHM="HS256",
+        ACCESS_TOKEN_EXPIRE_MINUTES=30,
+        REFRESH_TOKEN_EXPIRE_DAYS=7,
+    )

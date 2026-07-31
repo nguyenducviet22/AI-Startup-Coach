@@ -7,10 +7,13 @@ from app.domain.stages import StageName
 
 
 OptionalName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+Email = Annotated[str, StringConstraints(strip_whitespace=True, min_length=3, max_length=320)]
+Password = Annotated[str, StringConstraints(min_length=8)]
 
 
 class CreateStartupRequest(BaseModel):
-    user_id: UUID
+    model_config = ConfigDict(extra="forbid")
+
     name: OptionalName | None = None
 
 
@@ -24,7 +27,8 @@ class StartupResponse(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    user_id: UUID
+    model_config = ConfigDict(extra="forbid")
+
     message: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
     session_id: UUID | None = None
 
@@ -32,6 +36,43 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     session_id: UUID
     message: str
+
+
+class AuthSignupRequest(BaseModel):
+    name: OptionalName
+    email: Email
+    password: Password
+
+
+class AuthLoginRequest(BaseModel):
+    email: Email
+    password: Password
+
+
+class AuthRefreshRequest(BaseModel):
+    refresh_token: str
+
+
+class AuthLogoutRequest(BaseModel):
+    refresh_token: str
+
+
+class AuthUserResponse(BaseModel):
+    id: UUID
+    name: str
+    email: str
+
+
+class AuthTokenResponse(BaseModel):
+    user: AuthUserResponse
+    access_token: str
+    refresh_token: str
+    token_type: str
+    expires_in: int
+
+
+class AuthLogoutResponse(BaseModel):
+    revoked: bool
 
 
 class DocumentResponse(BaseModel):

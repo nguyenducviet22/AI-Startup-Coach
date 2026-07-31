@@ -2,6 +2,7 @@ import json
 from dataclasses import dataclass
 from typing import Any
 
+from app.core.config import Settings
 from app.llm.openrouter import ChatCompletionClient, LLMProviderError
 from app.services.context_builder import StartupContext, build_context_messages
 from app.services.skill_loader import SkillLoader
@@ -23,10 +24,12 @@ class AgentOrchestrator:
         chat_client: ChatCompletionClient,
         tool_dispatcher: ToolDispatcher | None = None,
         skill_loader: SkillLoader | None = None,
+        settings: Settings | None = None,
     ) -> None:
         self.chat_client = chat_client
         self.tool_dispatcher = tool_dispatcher or ToolDispatcher()
         self.skill_loader = skill_loader or SkillLoader()
+        self.settings = settings
 
     async def handle_message(
         self,
@@ -58,6 +61,7 @@ class AgentOrchestrator:
             user_message=user_message,
             current_document=current_document,
             skill_loader=self.skill_loader,
+            settings=self.settings,
         )
         tools = get_openai_tools_for_stage(startup.current_stage)
 

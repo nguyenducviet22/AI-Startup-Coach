@@ -155,6 +155,10 @@ def _settings(llm_max_retries: int = 2) -> Settings:
         CHAT_HISTORY_LIMIT=20,
         LLM_MAX_RETRIES=llm_max_retries,
         LLM_RETRY_BACKOFF_SECONDS=0,
+        JWT_SECRET="openrouter-test-secret-with-at-least-thirty-two-bytes",
+        JWT_ALGORITHM="HS256",
+        ACCESS_TOKEN_EXPIRE_MINUTES=30,
+        REFRESH_TOKEN_EXPIRE_DAYS=7,
     )
 
 

@@ -24,4 +24,5 @@ class User(Base):
     )
 
     startups = relationship("Startup", back_populates="user")
-
+    auth_credentials = relationship("AuthCredential", back_populates="user")
+    refresh_tokens = relationship("RefreshToken", back_populates="user")

@@ -1,6 +1,7 @@
 import json
 import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -11,10 +12,14 @@ from testcontainers.community.postgres import PostgresContainer
 
 import app.db.base  # noqa: F401
 from app.api.dependencies import get_chat_client
+from app.api.routes import get_settings
+from app.core.config import Settings
+from app.core.security import create_access_token
 from app.db.session import get_db_session
 from app.main import app
 from app.models.base import Base
 from app.models.chat import ChatMessage
+from app.models.startup import Startup
 from app.models.user import User
 
 
@@ -51,6 +56,7 @@ async def client(
 
     app.dependency_overrides[get_db_session] = override_session
     app.dependency_overrides[get_chat_client] = lambda: fake_chat_client
+    app.dependency_overrides[get_settings] = _settings
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
@@ -65,40 +71,93 @@ async def test_startup_routes_create_get_advance_and_set_stage(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
 
     create_response = await client.post(
         "/startups",
-        json={"user_id": str(user_id), "name": "TutorOS"},
+        json={"name": "TutorOS"},
+        headers=headers,
     )
     assert create_response.status_code == 201
     startup = create_response.json()
     assert startup["user_id"] == str(user_id)
     assert startup["current_stage"] == "idea"
 
-    get_response = await client.get(f"/startups/{startup['id']}")
+    get_response = await client.get(f"/startups/{startup['id']}", headers=headers)
     assert get_response.status_code == 200
     assert get_response.json()["name"] == "TutorOS"
 
-    advance_response = await client.post(f"/startups/{startup['id']}/advance-stage")
+    advance_response = await client.post(f"/startups/{startup['id']}/advance-stage", headers=headers)
     assert advance_response.status_code == 200
     assert advance_response.json()["current_stage"] == "lean_canvas"
 
     set_response = await client.patch(
         f"/startups/{startup['id']}/stage",
         json={"stage": "bmc"},
+        headers=headers,
     )
     assert set_response.status_code == 200
     assert set_response.json()["current_stage"] == "bmc"
 
 
-async def test_create_startup_rejects_missing_user(client: httpx.AsyncClient) -> None:
+async def test_create_startup_rejects_token_for_missing_user(client: httpx.AsyncClient) -> None:
+    missing_user_id = uuid.uuid4()
     response = await client.post(
         "/startups",
-        json={"user_id": str(uuid.uuid4()), "name": "Ghost startup"},
+        json={"name": "Ghost startup"},
+        headers=_auth_headers(missing_user_id),
     )
 
-    assert response.status_code == 404
-    assert "User" in response.json()["detail"]
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "invalid_token"
+
+
+async def test_create_startup_derives_user_id_from_verified_token(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+
+    response = await client.post(
+        "/startups",
+        json={"name": "TutorOS"},
+        headers=_auth_headers(user_id),
+    )
+
+    assert response.status_code == 201
+    assert response.json()["user_id"] == str(user_id)
+
+
+async def test_existing_routes_reject_invalid_access_token(client: httpx.AsyncClient) -> None:
+    response = await client.post(
+        "/startups",
+        json={"name": "TutorOS"},
+        headers={"Authorization": "Bearer not-a-jwt"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "invalid_token"
+
+
+async def test_existing_routes_reject_expired_access_token(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    expired_token = create_access_token(
+        user_id,
+        settings=_settings(),
+        now=datetime.now(UTC) - timedelta(minutes=31),
+    )
+
+    response = await client.post(
+        "/startups",
+        json={"name": "TutorOS"},
+        headers={"Authorization": f"Bearer {expired_token}"},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "expired_token"
 
 
 async def test_chat_route_persists_messages_and_document_with_mocked_llm(
@@ -106,10 +165,11 @@ async def test_chat_route_persists_messages_and_document_with_mocked_llm(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
     startup_id = (
-        await client.post("/startups", json={"user_id": str(user_id), "name": "TutorOS"})
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
     ).json()["id"]
-    await client.post(f"/startups/{startup_id}/advance-stage")
+    await client.post(f"/startups/{startup_id}/advance-stage", headers=headers)
 
     client.fake_chat_client.responses = [
         _response(
@@ -132,7 +192,8 @@ async def test_chat_route_persists_messages_and_document_with_mocked_llm(
 
     chat_response = await client.post(
         f"/startups/{startup_id}/chat",
-        json={"user_id": str(user_id), "message": "Draft the canvas."},
+        json={"message": "Draft the canvas."},
+        headers=headers,
     )
 
     assert chat_response.status_code == 200
@@ -140,7 +201,7 @@ async def test_chat_route_persists_messages_and_document_with_mocked_llm(
     assert chat_payload["message"] == "I drafted the lean canvas."
     assert chat_payload["session_id"]
 
-    document_response = await client.get(f"/startups/{startup_id}/documents/lean_canvas")
+    document_response = await client.get(f"/startups/{startup_id}/documents/lean_canvas", headers=headers)
     assert document_response.status_code == 200
     document = document_response.json()
     assert document["version"] == 1
@@ -166,7 +227,8 @@ async def test_chat_route_persists_messages_and_document_with_mocked_llm(
     client.fake_chat_client.responses = [_response("Let us refine the customer segment.")]
     followup_response = await client.post(
         f"/startups/{startup_id}/chat",
-        json={"user_id": str(user_id), "message": "What should I improve?"},
+        json={"message": "What should I improve?"},
+        headers=headers,
     )
 
     assert followup_response.status_code == 200
@@ -183,18 +245,21 @@ async def test_chat_route_reuses_latest_session_when_session_id_absent(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
     startup_id = (
-        await client.post("/startups", json={"user_id": str(user_id), "name": "TutorOS"})
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
     ).json()["id"]
     client.fake_chat_client.responses = [_response("First reply."), _response("Second reply.")]
 
     first = await client.post(
         f"/startups/{startup_id}/chat",
-        json={"user_id": str(user_id), "message": "Hello"},
+        json={"message": "Hello"},
+        headers=headers,
     )
     second = await client.post(
         f"/startups/{startup_id}/chat",
-        json={"user_id": str(user_id), "message": "Again"},
+        json={"message": "Again"},
+        headers=headers,
     )
 
     assert first.status_code == 200
@@ -207,14 +272,76 @@ async def test_document_routes_reject_unknown_doc_type(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
     startup_id = (
-        await client.post("/startups", json={"user_id": str(user_id), "name": "TutorOS"})
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
     ).json()["id"]
 
-    response = await client.get(f"/startups/{startup_id}/documents/not_a_doc")
+    response = await client.get(f"/startups/{startup_id}/documents/not_a_doc", headers=headers)
 
     assert response.status_code == 400
     assert "Unknown document type" in response.json()["detail"]
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "json_body"),
+    [
+        ("POST", "/startups", {"name": "TutorOS"}),
+        ("GET", "/startups/{startup_id}", None),
+        ("POST", "/startups/{startup_id}/chat", {"message": "Hello"}),
+        ("GET", "/startups/{startup_id}/documents/lean_canvas", None),
+        ("GET", "/startups/{startup_id}/documents/lean_canvas/history", None),
+        ("POST", "/startups/{startup_id}/advance-stage", None),
+        ("PATCH", "/startups/{startup_id}/stage", {"stage": "bmc"}),
+    ],
+)
+async def test_existing_routes_reject_unauthenticated_requests(
+    client: httpx.AsyncClient,
+    method: str,
+    path: str,
+    json_body: dict[str, Any] | None,
+) -> None:
+    startup_id = uuid.uuid4()
+    response = await client.request(
+        method,
+        path.format(startup_id=startup_id),
+        json=json_body,
+    )
+
+    assert response.status_code == 401
+    assert response.json()["detail"]["code"] == "missing_token"
+
+
+@pytest.mark.parametrize(
+    ("method", "path", "json_body"),
+    [
+        ("GET", "/startups/{startup_id}", None),
+        ("POST", "/startups/{startup_id}/chat", {"message": "Hello"}),
+        ("GET", "/startups/{startup_id}/documents/lean_canvas", None),
+        ("GET", "/startups/{startup_id}/documents/lean_canvas/history", None),
+        ("POST", "/startups/{startup_id}/advance-stage", None),
+        ("PATCH", "/startups/{startup_id}/stage", {"stage": "bmc"}),
+    ],
+)
+async def test_startup_scoped_routes_return_404_for_non_owner(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+    method: str,
+    path: str,
+    json_body: dict[str, Any] | None,
+) -> None:
+    owner_id = await _create_user(session_factory)
+    other_user_id = await _create_user(session_factory)
+    startup_id = await _create_startup(session_factory, owner_id)
+
+    response = await client.request(
+        method,
+        path.format(startup_id=startup_id),
+        json=json_body,
+        headers=_auth_headers(other_user_id),
+    )
+
+    assert response.status_code == 404
 
 
 async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_advancement(
@@ -222,10 +349,12 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
     user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
     startup = (
         await client.post(
             "/startups",
-            json={"user_id": str(user_id), "name": "TutorOS"},
+            json={"name": "TutorOS"},
+            headers=headers,
         )
     ).json()
     startup_id = startup["id"]
@@ -251,13 +380,14 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     ]
     idea_chat = await client.post(
         f"/startups/{startup_id}/chat",
-        json={"user_id": str(user_id), "message": "Are we ready for lean canvas?"},
+        json={"message": "Are we ready for lean canvas?"},
+        headers=headers,
     )
 
     assert idea_chat.status_code == 200
-    assert (await client.get(f"/startups/{startup_id}")).json()["current_stage"] == "idea"
+    assert (await client.get(f"/startups/{startup_id}", headers=headers)).json()["current_stage"] == "idea"
 
-    advance_to_lean = await client.post(f"/startups/{startup_id}/advance-stage")
+    advance_to_lean = await client.post(f"/startups/{startup_id}/advance-stage", headers=headers)
     assert advance_to_lean.status_code == 200
     assert advance_to_lean.json()["current_stage"] == "lean_canvas"
 
@@ -281,11 +411,12 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     ]
     first_canvas_chat = await client.post(
         f"/startups/{startup_id}/chat",
-        json={"user_id": str(user_id), "message": "Draft the lean canvas."},
+        json={"message": "Draft the lean canvas."},
+        headers=headers,
     )
 
     assert first_canvas_chat.status_code == 200
-    current_canvas = (await client.get(f"/startups/{startup_id}/documents/lean_canvas")).json()
+    current_canvas = (await client.get(f"/startups/{startup_id}/documents/lean_canvas", headers=headers)).json()
     assert current_canvas["version"] == 1
     assert current_canvas["is_current"] is True
     assert current_canvas["content"]["problem"] == "Tutors lose hours coordinating lessons."
@@ -320,14 +451,15 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     ]
     second_canvas_chat = await client.post(
         f"/startups/{startup_id}/chat",
-        json={"user_id": str(user_id), "message": "Refine the canvas and check readiness."},
+        json={"message": "Refine the canvas and check readiness."},
+        headers=headers,
     )
 
     assert second_canvas_chat.status_code == 200
-    assert (await client.get(f"/startups/{startup_id}")).json()["current_stage"] == "lean_canvas"
+    assert (await client.get(f"/startups/{startup_id}", headers=headers)).json()["current_stage"] == "lean_canvas"
 
     canvas_history = (
-        await client.get(f"/startups/{startup_id}/documents/lean_canvas/history")
+        await client.get(f"/startups/{startup_id}/documents/lean_canvas/history", headers=headers)
     ).json()["documents"]
     assert [document["version"] for document in canvas_history] == [2, 1]
     assert [document["is_current"] for document in canvas_history] == [True, False]
@@ -336,7 +468,7 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     )
     assert canvas_history[1]["content"]["problem"] == "Tutors lose hours coordinating lessons."
 
-    advance_to_bmc = await client.post(f"/startups/{startup_id}/advance-stage")
+    advance_to_bmc = await client.post(f"/startups/{startup_id}/advance-stage", headers=headers)
     assert advance_to_bmc.status_code == 200
     assert advance_to_bmc.json()["current_stage"] == "bmc"
 
@@ -361,11 +493,12 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     ]
     bmc_chat = await client.post(
         f"/startups/{startup_id}/chat",
-        json={"user_id": str(user_id), "message": "Create the BMC."},
+        json={"message": "Create the BMC."},
+        headers=headers,
     )
 
     assert bmc_chat.status_code == 200
-    bmc_document = (await client.get(f"/startups/{startup_id}/documents/bmc")).json()
+    bmc_document = (await client.get(f"/startups/{startup_id}/documents/bmc", headers=headers)).json()
     assert bmc_document["version"] == 1
     assert bmc_document["is_current"] is True
     assert bmc_document["content"]["customer_segments"] == "Multi-location tutoring centers."
@@ -380,6 +513,17 @@ async def _create_user(session_factory: async_sessionmaker[AsyncSession]) -> uui
         session.add(user)
         await session.commit()
         return user.id
+
+
+async def _create_startup(
+    session_factory: async_sessionmaker[AsyncSession],
+    user_id: uuid.UUID,
+) -> uuid.UUID:
+    async with session_factory() as session:
+        startup = Startup(user_id=user_id, name="TutorOS")
+        session.add(startup)
+        await session.commit()
+        return startup.id
 
 
 class FakeChatClient:
@@ -421,6 +565,30 @@ def _tool_call(call_id: str, name: str, arguments: dict[str, Any]) -> dict[str, 
             "arguments": json.dumps(arguments),
         },
     }
+
+
+def _auth_headers(user_id: uuid.UUID) -> dict[str, str]:
+    return {
+        "Authorization": f"Bearer {create_access_token(user_id, settings=_settings())}",
+    }
+
+
+def _settings() -> Settings:
+    return Settings(
+        DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/coaching",
+        OPENROUTER_API_KEY="test-key",
+        OPENROUTER_BASE_URL="https://openrouter.test/api/v1",
+        OPENROUTER_MODEL="test-model",
+        OPENROUTER_HTTP_REFERER="http://localhost:8000",
+        OPENROUTER_X_TITLE="AI Startup Coach",
+        CHAT_HISTORY_LIMIT=20,
+        LLM_MAX_RETRIES=2,
+        LLM_RETRY_BACKOFF_SECONDS=0,
+        JWT_SECRET="route-test-secret-with-at-least-thirty-two-bytes",
+        JWT_ALGORITHM="HS256",
+        ACCESS_TOKEN_EXPIRE_MINUTES=30,
+        REFRESH_TOKEN_EXPIRE_DAYS=7,
+    )
 
 
 def _asyncpg_url(url: str) -> str:

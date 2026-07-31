@@ -1,3 +1,4 @@
+from app.models.auth import AuthCredential, RefreshToken
 from app.models.chat import ChatMessage, ChatSession
 from app.models.documents import (
     Bmc,
@@ -12,14 +13,15 @@ from app.models.user import User
 
 __all__ = [
     "Bmc",
+    "AuthCredential",
     "ChatMessage",
     "ChatSession",
     "FundingGuide",
     "LeanCanvas",
     "MarketingStrategy",
     "ProductPlan",
+    "RefreshToken",
     "Startup",
     "Swot",
     "User",
 ]
-
