@@ -1,3 +1,4 @@
+from app.models.agentops import AgentTurn, AlertEvent, LlmCall, ToolCallLog
 from app.models.auth import AuthCredential, RefreshToken
 from app.models.chat import ChatMessage, ChatSession
 from app.models.documents import (
@@ -12,16 +13,20 @@ from app.models.startup import Startup
 from app.models.user import User
 
 __all__ = [
-    "Bmc",
+    "AgentTurn",
+    "AlertEvent",
     "AuthCredential",
+    "Bmc",
     "ChatMessage",
     "ChatSession",
     "FundingGuide",
     "LeanCanvas",
+    "LlmCall",
     "MarketingStrategy",
     "ProductPlan",
     "RefreshToken",
     "Startup",
     "Swot",
+    "ToolCallLog",
     "User",
 ]

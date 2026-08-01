@@ -1,3 +1,4 @@
+import uuid
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -32,6 +33,9 @@ from app.services.auth_service import AuthService, AuthServiceError
 from app.services.chat_service import ChatService, ChatServiceError
 from app.services.context_builder import StartupContext
 from app.services.document_service import DocumentService, UnknownDocumentTypeError
+from app.services.agentops.instrumented_chat_client import InstrumentedChatClient
+from app.services.agentops.instrumented_orchestrator import InstrumentedAgentOrchestrator
+from app.services.agentops.instrumented_tool_dispatcher import InstrumentedToolDispatcher
 from app.services.orchestrator import AgentOrchestrator
 from app.services.stage_service import AlreadyCompletedError, StageService
 from app.services.startup_service import (
@@ -166,13 +170,35 @@ async def chat(
             startup_id=startup.id,
             current_stage=startup.current_stage,
         )
-
-        orchestrator = AgentOrchestrator(
-            chat_client=chat_client,
-            tool_dispatcher=ToolDispatcher(document_service=document_service),
+        turn_id = uuid.uuid4()
+        instrumented_chat_client = InstrumentedChatClient(
+            wrapped=chat_client,
+            turn_id=turn_id,
+            startup_id=startup.id,
+            session_id=chat_session.id,
+            stage=startup.current_stage,
             settings=settings,
         )
-        result = await orchestrator.handle_turn(
+        tool_dispatcher = InstrumentedToolDispatcher(
+            wrapped=ToolDispatcher(document_service=document_service),
+            turn_id=turn_id,
+            startup_id=startup.id,
+            stage=startup.current_stage,
+        )
+
+        orchestrator = AgentOrchestrator(
+            chat_client=instrumented_chat_client,
+            tool_dispatcher=tool_dispatcher,
+            settings=settings,
+        )
+        instrumented_orchestrator = InstrumentedAgentOrchestrator(
+            wrapped=orchestrator,
+            turn_id=turn_id,
+            startup_id=startup.id,
+            session_id=chat_session.id,
+            stage=startup.current_stage,
+        )
+        result = await instrumented_orchestrator.handle_turn(
             startup=StartupContext(
                 startup_id=str(startup.id),
                 user_id=str(startup.user_id),

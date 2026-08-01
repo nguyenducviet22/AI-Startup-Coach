@@ -33,6 +33,7 @@ class Settings(BaseSettings):
     chat_history_limit: int = Field(default=20, alias="CHAT_HISTORY_LIMIT")
     llm_max_retries: int = Field(default=2, alias="LLM_MAX_RETRIES")
     llm_retry_backoff_seconds: float = Field(default=1.0, alias="LLM_RETRY_BACKOFF_SECONDS")
+    agentops_pricing_enabled: bool = Field(default=True, alias="AGENTOPS_PRICING_ENABLED")
 
     jwt_secret: str = Field(alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")

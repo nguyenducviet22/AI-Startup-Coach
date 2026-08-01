@@ -15,7 +15,10 @@ from app.api.dependencies import get_chat_client
 from app.api.routes import get_settings
 from app.core.config import Settings
 from app.core.security import create_access_token
+from app.db import session as db_session
 from app.db.session import get_db_session
+from app.llm.openrouter import LLMProviderError
+from app.models.agentops import AgentTurn, LlmCall, ToolCallLog
 from app.main import app
 from app.models.base import Base
 from app.models.chat import ChatMessage, ChatSession
@@ -47,6 +50,8 @@ async def session_factory(
 @pytest.fixture()
 async def client(
     session_factory: async_sessionmaker[AsyncSession],
+    postgres_url: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> AsyncIterator[httpx.AsyncClient]:
     fake_chat_client = FakeChatClient()
 
@@ -54,6 +59,10 @@ async def client(
         async with session_factory() as session:
             yield session
 
+    monkeypatch.setenv("DATABASE_URL", postgres_url)
+    monkeypatch.setenv("JWT_SECRET", "route-test-secret-with-at-least-thirty-two-bytes")
+    get_settings.cache_clear()
+    _reset_app_db_session()
     app.dependency_overrides[get_db_session] = override_session
     app.dependency_overrides[get_chat_client] = lambda: fake_chat_client
     app.dependency_overrides[get_settings] = _settings
@@ -64,6 +73,8 @@ async def client(
         yield test_client
 
     app.dependency_overrides.clear()
+    _reset_app_db_session()
+    get_settings.cache_clear()
 
 
 async def test_startup_routes_create_get_advance_and_set_stage(
@@ -279,6 +290,9 @@ async def test_chat_route_persists_messages_and_document_with_mocked_llm(
                 .order_by(ChatMessage.sequence)
             )
         ).scalars().all()
+        turns = (await session.execute(select(AgentTurn))).scalars().all()
+        llm_calls = (await session.execute(select(LlmCall).order_by(LlmCall.sequence))).scalars().all()
+        tool_calls = (await session.execute(select(ToolCallLog))).scalars().all()
 
     assert [(message.role, message.content) for message in messages] == [
         ("user", "Draft the canvas."),
@@ -288,6 +302,19 @@ async def test_chat_route_persists_messages_and_document_with_mocked_llm(
     assert json.loads(messages[1].content)["persistence"]["status"] == "persisted"
     assert messages[1].tool_call_data == {"tool_call_id": "call-canvas"}
     assert messages[2].tool_call_data[0]["tool_name"] == "generate_lean_canvas"
+    assert len(turns) == 1
+    assert turns[0].startup_id == uuid.UUID(startup_id)
+    assert turns[0].session_id == uuid.UUID(chat_payload["session_id"])
+    assert turns[0].stage == "lean_canvas"
+    assert turns[0].status == "success"
+    assert turns[0].tool_call_count == 1
+    assert len(llm_calls) == 2
+    assert {llm_call.turn_id for llm_call in llm_calls} == {turns[0].id}
+    assert [llm_call.status for llm_call in llm_calls] == ["success", "success"]
+    assert len(tool_calls) == 1
+    assert tool_calls[0].turn_id == turns[0].id
+    assert tool_calls[0].tool_name == "generate_lean_canvas"
+    assert tool_calls[0].status == "ok"
 
     client.fake_chat_client.responses = [_response("Let us refine the customer segment.")]
     followup_response = await client.post(
@@ -303,6 +330,126 @@ async def test_chat_route_persists_messages_and_document_with_mocked_llm(
         if message["role"] != "system"
     ]
     assert replayed_roles == ["user", "assistant", "user"]
+
+
+async def test_chat_route_records_recovered_llm_error_as_successful_turn(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+    client.fake_chat_client.responses = [
+        LLMProviderError(
+            "provider down",
+            "The AI coach is temporarily unavailable. Please try again in a moment.",
+        )
+    ]
+
+    response = await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "Hello"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "The AI coach is temporarily unavailable. Please try again in a moment."
+    assert response.json()["stage_readiness"] is None
+
+    async with session_factory() as session:
+        turn = (await session.execute(select(AgentTurn))).scalar_one()
+        llm_call = (await session.execute(select(LlmCall))).scalar_one()
+
+    assert turn.status == "success"
+    assert turn.tool_call_count == 0
+    assert llm_call.turn_id == turn.id
+    assert llm_call.status == "error"
+    assert llm_call.error_code == "LLMProviderError"
+
+
+async def test_chat_route_records_escaped_exception_as_error_turn(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+    client.fake_chat_client.responses = [RuntimeError("unexpected failure")]
+
+    with pytest.raises(RuntimeError, match="unexpected failure"):
+        await client.post(
+            f"/startups/{startup_id}/chat",
+            json={"message": "Hello"},
+            headers=headers,
+        )
+
+    async with session_factory() as session:
+        turn = (await session.execute(select(AgentTurn))).scalar_one()
+        llm_call = (await session.execute(select(LlmCall))).scalar_one()
+
+    assert turn.status == "error"
+    assert turn.tool_call_count == 0
+    assert llm_call.turn_id == turn.id
+    assert llm_call.status == "error"
+    assert llm_call.error_code == "RuntimeError"
+
+
+async def test_chat_route_succeeds_when_agentops_metrics_writes_fail(
+    client: httpx.AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    async def fail_metrics(*args: Any, **kwargs: Any) -> None:
+        raise RuntimeError("metrics database unavailable")
+
+    monkeypatch.setattr(
+        "app.services.agentops.instrumented_chat_client.record_llm_call",
+        fail_metrics,
+    )
+    monkeypatch.setattr(
+        "app.services.agentops.instrumented_tool_dispatcher.record_tool_call",
+        fail_metrics,
+    )
+    monkeypatch.setattr(
+        "app.services.agentops.instrumented_orchestrator.start_turn",
+        fail_metrics,
+    )
+    monkeypatch.setattr(
+        "app.services.agentops.instrumented_orchestrator.finish_turn",
+        fail_metrics,
+    )
+    user_id = await _create_user(session_factory)
+    headers = _auth_headers(user_id)
+    startup_id = (
+        await client.post("/startups", json={"name": "TutorOS"}, headers=headers)
+    ).json()["id"]
+    client.fake_chat_client.responses = [
+        _response(
+            None,
+            tool_calls=[
+                _tool_call(
+                    "call-readiness",
+                    "check_stage_readiness",
+                    {"current_stage": "idea", "ready": True, "missing_fields": []},
+                )
+            ],
+        ),
+        _response("You have enough to move forward."),
+    ]
+
+    response = await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "Are we ready?"},
+        headers=headers,
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "You have enough to move forward."
+    assert response.json()["stage_readiness"] == {"ready": True, "missing_fields": []}
 
 
 async def test_chat_route_reuses_latest_session_when_session_id_absent(
@@ -812,7 +959,10 @@ class FakeChatClient:
         model: str | None = None,
     ) -> Any:
         self.requests.append({"messages": messages, "tools": tools, "model": model})
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
 
 
 def _response(content: str | None, tool_calls: list[dict[str, Any]] | None = None) -> dict[str, Any]:
@@ -870,3 +1020,8 @@ def _asyncpg_url(url: str) -> str:
     if url.startswith("postgresql://"):
         return url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return url
+
+
+def _reset_app_db_session() -> None:
+    db_session._engine = None
+    db_session._session_local = None

@@ -1,0 +1,73 @@
+{
+  "case_id": "lean_canvas_generation_and_readiness",
+  "stage": "lean_canvas",
+  "startup": {
+    "startup_id": "eval-startup-lean-canvas",
+    "user_id": "eval-user",
+    "name": "TutorOS"
+  },
+  "history": [
+    {
+      "role": "assistant",
+      "content": "We have a tutoring workflow idea. Let's structure the business model."
+    }
+  ],
+  "student_messages": [
+    "Draft the lean canvas for tutoring centers: scheduling is painful, automation is the solution, and owners are the first customers."
+  ],
+  "llm_responses": [
+    {
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-lean-canvas",
+          "name": "generate_lean_canvas",
+          "arguments": {
+            "problem": "Tutoring centers lose time coordinating schedules, reminders, and lesson follow-ups.",
+            "solution": "Automated scheduling, reminder, and follow-up workflows for tutoring teams.",
+            "unique_value_proposition": "Less admin work for tutoring centers without changing how tutors teach.",
+            "customer_segments": "Independent tutoring centers and small after-school programs.",
+            "channels": "Tutor owner communities and education operations newsletters."
+          }
+        },
+        {
+          "id": "call-lean-readiness",
+          "name": "check_stage_readiness",
+          "arguments": {
+            "current_stage": "lean_canvas",
+            "ready": true,
+            "missing_fields": []
+          }
+        }
+      ]
+    },
+    {
+      "content": "I drafted the lean canvas and the required fields are complete."
+    }
+  ],
+  "expected": {
+    "tool_calls": [
+      {
+        "tool_name": "generate_lean_canvas",
+        "required_fields": [
+          "problem",
+          "solution",
+          "unique_value_proposition",
+          "customer_segments"
+        ]
+      },
+      {
+        "tool_name": "check_stage_readiness",
+        "required_fields": [
+          "current_stage",
+          "ready",
+          "missing_fields"
+        ]
+      }
+    ],
+    "stage_readiness": {
+      "ready": true,
+      "missing_fields": []
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "case_id": "bmc_generation_and_readiness",
+  "stage": "bmc",
+  "startup": {
+    "startup_id": "eval-startup-bmc",
+    "user_id": "eval-user",
+    "name": "TutorOS"
+  },
+  "history": [
+    {
+      "role": "assistant",
+      "content": "The lean canvas is complete. Now let's express it as a business model canvas."
+    }
+  ],
+  "student_messages": [
+    "Create the BMC with tutoring centers as customers, reduced admin as the value proposition, and partnerships with tutor communities."
+  ],
+  "llm_responses": [
+    {
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-bmc",
+          "name": "generate_bmc",
+          "arguments": {
+            "customer_segments": "Independent tutoring centers and small after-school programs.",
+            "value_propositions": "Reduce admin coordination while preserving the center's existing teaching workflow.",
+            "key_partners": "Tutor owner communities, education operations newsletters, and scheduling platform partners.",
+            "key_activities": "Workflow automation, onboarding, support, and integrations.",
+            "key_resources": "Scheduling automation software, tutor-center workflow templates, and customer success playbooks."
+          }
+        },
+        {
+          "id": "call-bmc-readiness",
+          "name": "check_stage_readiness",
+          "arguments": {
+            "current_stage": "bmc",
+            "ready": true,
+            "missing_fields": []
+          }
+        }
+      ]
+    },
+    {
+      "content": "I drafted the business model canvas and it is ready for review."
+    }
+  ],
+  "expected": {
+    "tool_calls": [
+      {
+        "tool_name": "generate_bmc",
+        "required_fields": [
+          "customer_segments",
+          "value_propositions"
+        ]
+      },
+      {
+        "tool_name": "check_stage_readiness",
+        "required_fields": [
+          "current_stage",
+          "ready",
+          "missing_fields"
+        ]
+      }
+    ],
+    "stage_readiness": {
+      "ready": true,
+      "missing_fields": []
+    }
+  }
+}

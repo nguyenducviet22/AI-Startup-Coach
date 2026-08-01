@@ -1,0 +1,48 @@
+{
+  "case_id": "idea_readiness",
+  "stage": "idea",
+  "startup": {
+    "startup_id": "eval-startup-idea",
+    "user_id": "eval-user",
+    "name": "TutorOS"
+  },
+  "history": [],
+  "student_messages": [
+    "My startup helps independent tutors coordinate schedules and lesson follow-ups."
+  ],
+  "llm_responses": [
+    {
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-idea-readiness",
+          "name": "check_stage_readiness",
+          "arguments": {
+            "current_stage": "idea",
+            "ready": true,
+            "missing_fields": []
+          }
+        }
+      ]
+    },
+    {
+      "content": "The idea is clear enough to ask whether you want to advance."
+    }
+  ],
+  "expected": {
+    "tool_calls": [
+      {
+        "tool_name": "check_stage_readiness",
+        "required_fields": [
+          "current_stage",
+          "ready",
+          "missing_fields"
+        ]
+      }
+    ],
+    "stage_readiness": {
+      "ready": true,
+      "missing_fields": []
+    }
+  }
+}
