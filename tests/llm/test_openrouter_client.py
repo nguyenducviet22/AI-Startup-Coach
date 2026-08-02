@@ -123,6 +123,15 @@ async def test_openrouter_client_raises_provider_error_after_retries_are_exhaust
     assert "temporarily unavailable" in exc_info.value.student_message
 
 
+def test_provider_error_does_not_include_upstream_exception_details() -> None:
+    error = OpenRouterChatClient._provider_error(
+        RuntimeError("upstream response body contains a secret")
+    )
+
+    assert str(error) == "LLM_PROVIDER_REQUEST_FAILED"
+    assert "secret" not in str(error)
+
+
 def test_openrouter_client_constructs_sdk_client_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     captured: dict[str, Any] = {}
 
@@ -148,6 +157,9 @@ def test_openrouter_client_constructs_sdk_client_from_settings(monkeypatch: pyte
 def _settings(llm_max_retries: int = 2) -> Settings:
     return Settings(
         DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/coaching",
+        LLM_PROXY_API_KEY="test-key",
+        LLM_PROXY_BASE_URL="https://openrouter.test/api/v1",
+        LLM_PROXY_MODEL="configured-model",
         OPENROUTER_API_KEY="test-key",
         OPENROUTER_BASE_URL="https://openrouter.test/api/v1",
         OPENROUTER_MODEL="configured-model",

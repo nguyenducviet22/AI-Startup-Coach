@@ -1,8 +1,15 @@
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+MODEL_PLACEHOLDERS = frozenset(
+    {
+        "replace-with-openrouter-model-slug",
+        "replace-with-9router-model-id",
+    }
+)
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -12,6 +19,25 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/coaching",
         alias="DATABASE_URL",
+    )
+
+    app_environment: str = Field(default="local", alias="APP_ENV")
+
+    llm_proxy_api_key: str = Field(
+        default="",
+        alias="LLM_PROXY_API_KEY",
+    )
+    llm_proxy_base_url: str = Field(
+        default="",
+        alias="LLM_PROXY_BASE_URL",
+    )
+    llm_proxy_model: str = Field(
+        default="",
+        alias="LLM_PROXY_MODEL",
+    )
+    llm_proxy_max_tokens: int = Field(
+        default=1024,
+        alias="LLM_PROXY_MAX_TOKENS",
     )
 
     openrouter_api_key: str = Field(default="", alias="OPENROUTER_API_KEY")
@@ -45,6 +71,31 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8",
         extra="ignore",
     )
+
+    @model_validator(mode="after")
+    def validate_llm_proxy_configuration(self) -> "Settings":
+        if not self.llm_proxy_api_key.strip():
+            self.llm_proxy_api_key = self.openrouter_api_key
+        if not self.llm_proxy_model.strip():
+            self.llm_proxy_model = self.openrouter_model
+        if (
+            "llm_proxy_max_tokens" not in self.model_fields_set
+            and self.openrouter_max_tokens != 1024
+        ):
+            self.llm_proxy_max_tokens = self.openrouter_max_tokens
+        if not self.llm_proxy_base_url.strip():
+            if self.app_environment.strip().lower() == "local":
+                self.llm_proxy_base_url = "http://localhost:20128/v1"
+            else:
+                raise ValueError("LLM_PROXY_BASE_URL is required when APP_ENV is not local.")
+        self.llm_proxy_base_url = self.llm_proxy_base_url.strip().rstrip("/")
+        if self.app_environment.strip().lower() != "local":
+            effective_model = self.llm_proxy_model.strip()
+            if not effective_model or effective_model in MODEL_PLACEHOLDERS:
+                raise ValueError(
+                    "LLM_PROXY_MODEL must be explicitly configured when APP_ENV is not local."
+                )
+        return self
 
 
 @lru_cache

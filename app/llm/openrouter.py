@@ -42,13 +42,15 @@ class OpenRouterChatClient:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         self.settings = settings or get_settings()
-        self.model = self.settings.openrouter_model
+        # 9Router uses the model identifier configured in its dashboard, commonly
+        # in provider/model form (for example, openai/gpt-4o).
+        self.model = self.settings.llm_proxy_model or self.settings.openrouter_model
         self.max_retries = self.settings.llm_max_retries
         self.backoff_seconds = self.settings.llm_retry_backoff_seconds
         self._sleep = sleep
         self._client = client or AsyncOpenAI(
-            api_key=self.settings.openrouter_api_key,
-            base_url=self.settings.openrouter_base_url,
+            api_key=self.settings.llm_proxy_api_key or self.settings.openrouter_api_key,
+            base_url=self.settings.llm_proxy_base_url,
             default_headers=self._default_headers(),
         )
 
@@ -62,7 +64,7 @@ class OpenRouterChatClient:
         request: dict[str, Any] = {
             "model": model or self.model,
             "messages": messages,
-            "max_tokens": self.settings.openrouter_max_tokens,
+            "max_tokens": self.settings.llm_proxy_max_tokens,
         }
         if tools is not None:
             request["tools"] = tools
@@ -105,9 +107,8 @@ class OpenRouterChatClient:
         return exc.status_code in TRANSIENT_STATUS_CODES
 
     @staticmethod
-    def _provider_error(exc: Exception | None) -> LLMProviderError:
-        detail = str(exc) if exc else "Unknown provider error."
+    def _provider_error(_exc: Exception | None) -> LLMProviderError:
         return LLMProviderError(
-            f"LLM provider request failed after retries: {detail}",
+            "LLM_PROVIDER_REQUEST_FAILED",
             "The AI coach is temporarily unavailable. Please try again in a moment.",
         )

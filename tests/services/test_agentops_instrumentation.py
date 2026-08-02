@@ -48,6 +48,30 @@ async def test_instrumented_chat_client_latency_excludes_metrics_write(monkeypat
     assert recorded["total_tokens"] == 1500
 
 
+async def test_instrumented_chat_client_uses_proxy_model_when_response_omits_model(monkeypatch) -> None:
+    recorded: dict[str, Any] = {}
+
+    async def record_llm_call_for_test(**kwargs: Any) -> None:
+        recorded.update(kwargs)
+
+    monkeypatch.setattr(
+        "app.services.agentops.instrumented_chat_client.record_llm_call",
+        record_llm_call_for_test,
+    )
+    client = InstrumentedChatClient(
+        wrapped=FakeChatClient(response={"usage": {}}),
+        turn_id=uuid.uuid4(),
+        startup_id=uuid.uuid4(),
+        session_id=None,
+        stage="idea",
+        settings=_settings(),
+    )
+
+    await client.create_chat_completion(messages=[{"role": "user", "content": "Hi"}])
+
+    assert recorded["model"] == "openai/gpt-4o-mini"
+
+
 async def test_instrumented_tool_dispatcher_latency_excludes_metrics_write(monkeypatch) -> None:
     recorded: dict[str, Any] = {}
 
@@ -119,6 +143,9 @@ def _settings() -> Settings:
         OPENROUTER_API_KEY="test-key",
         OPENROUTER_BASE_URL="https://openrouter.test/api/v1",
         OPENROUTER_MODEL="test-model",
+        LLM_PROXY_API_KEY="proxy-test-key",
+        LLM_PROXY_BASE_URL="https://9router.test/v1",
+        LLM_PROXY_MODEL="openai/gpt-4o-mini",
         OPENROUTER_HTTP_REFERER="http://localhost:8000",
         OPENROUTER_X_TITLE="AI Startup Coach",
         CHAT_HISTORY_LIMIT=20,
