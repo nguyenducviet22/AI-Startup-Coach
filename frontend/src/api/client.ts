@@ -1,6 +1,7 @@
 import type { ApiErrorBody, AuthTokenResponse } from "./types";
 
 const REFRESH_TOKEN_KEY = "ai-startup-coach.refresh-token";
+const OPENROUTER_API_KEY = "ai-startup-coach.openrouter-api-key";
 
 let accessToken: string | null = null;
 let refreshPromise: Promise<AuthTokenResponse> | null = null;
@@ -41,6 +42,19 @@ export function setStoredRefreshToken(token: string | null): void {
     return;
   }
   window.sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+}
+
+export function getStoredOpenRouterApiKey(): string | null {
+  return window.sessionStorage.getItem(OPENROUTER_API_KEY);
+}
+
+export function setStoredOpenRouterApiKey(apiKey: string | null): void {
+  const trimmedApiKey = apiKey?.trim() ?? "";
+  if (trimmedApiKey) {
+    window.sessionStorage.setItem(OPENROUTER_API_KEY, trimmedApiKey);
+    return;
+  }
+  window.sessionStorage.removeItem(OPENROUTER_API_KEY);
 }
 
 export function clearAuthTokens(): void {
