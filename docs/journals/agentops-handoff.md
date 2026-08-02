@@ -1,6 +1,7 @@
 # AgentOps Handoff Note
 
-**Status:** AgentOps phase complete, reviewed, and ready to ship.
+**Status:** AgentOps phase complete, reviewed, committed, and pushed to `main`.
+**Commit:** `327df8e` — "Add AgentOps instrumentation and evals"
 **Repo:** https://github.com/nguyenducviet22/AI-Startup-Coach
 **Base context:** Coaching harness, auth layer, and frontend/UI are already complete on `main`.
 **Full spec:** `docs/agentops-spec-draft-en.md`

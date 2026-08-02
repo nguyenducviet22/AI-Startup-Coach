@@ -28,6 +28,9 @@ def test_build_system_prompt_includes_rules_skill_and_current_document() -> None
 
     assert "# Base Coaching Rules" in prompt
     assert "Do not auto-advance" in prompt
+    assert "Response formatting rules:" in prompt
+    assert "Put every numbered item on a separate line." in prompt
+    assert "Put the final question in a separate paragraph." in prompt
     assert "# Skill: Lean Canvas" in prompt
     assert "current_stage: lean_canvas" in prompt
     assert '"problem": "Tutors lack scheduling flow."' in prompt

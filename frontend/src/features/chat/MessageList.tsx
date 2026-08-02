@@ -1,4 +1,6 @@
 import type { ChatMessage } from "../../api/chat";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 type MessageListProps = {
   messages: ChatMessage[];
@@ -24,7 +26,13 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
       {messages.map((message) => (
         <article className={`chat-message chat-message-${message.role}`} key={message.sequence}>
           <p className="message-role">{message.role === "user" ? "You" : "Coach"}</p>
-          <p>{message.content}</p>
+          {message.role === "assistant" ? (
+            <div className="message-content">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+            </div>
+          ) : (
+            <p className="message-content message-content-plain">{message.content}</p>
+          )}
         </article>
       ))}
     </div>

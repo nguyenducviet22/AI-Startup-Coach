@@ -88,13 +88,15 @@ export function AppShell() {
       </header>
 
       <div className="workspace-layout">
-        <aside className="startup-sidebar" aria-label="Startups">
+        <div className="startup-create-bar">
           <CreateStartupForm
             isCreating={createMutation.isPending}
             error={createMutation.error}
             onCreate={handleCreateStartup}
           />
+        </div>
 
+        <aside className="startup-sidebar" aria-label="Startups">
           <StartupList
             startups={startups}
             selectedStartupId={selectedStartup?.id ?? null}

@@ -64,8 +64,7 @@ class InstrumentedChatClient:
         effective_model = (
             model
             or _get_optional(response, "model")
-            or self._settings.llm_proxy_model
-            or self._settings.openrouter_model
+            or self._settings.llm_model
         )
         cost_usd, pricing_unknown = get_cost(
             str(effective_model),
@@ -105,7 +104,7 @@ class InstrumentedChatClient:
                 startup_id=self._startup_id,
                 session_id=self._session_id,
                 stage=self._stage,
-                model=model or self._settings.llm_proxy_model or self._settings.openrouter_model,
+                model=model or self._settings.llm_model,
                 prompt_tokens=prompt_tokens,
                 completion_tokens=completion_tokens,
                 total_tokens=total_tokens,
@@ -123,7 +122,7 @@ class InstrumentedChatClient:
                 self._startup_id,
                 self._session_id,
                 self._stage,
-                model or self._settings.llm_proxy_model or self._settings.openrouter_model,
+                model or self._settings.llm_model,
             )
 
 

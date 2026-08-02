@@ -209,13 +209,20 @@ p {
 
 .workspace-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 320px) 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: start;
   gap: 24px;
   width: min(100% - 32px, 1180px);
   margin: 24px auto;
 }
 
+.startup-create-bar {
+  grid-column: 2;
+  grid-row: 1;
+}
+
 .startup-sidebar,
+.startup-create-bar,
 .workspace-main,
 .workspace-section,
 .workspace-header,
@@ -226,12 +233,18 @@ p {
 }
 
 .startup-sidebar {
-  align-self: start;
+  grid-column: 1;
+  grid-row: 1;
+  padding: 18px;
+}
+
+.startup-create-bar {
   padding: 18px;
 }
 
 .workspace-main {
   min-width: 0;
+  grid-column: 1 / -1;
   padding: 22px;
 }
 
@@ -273,8 +286,10 @@ p {
 
 .create-startup-form {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
   gap: 12px;
-  margin-bottom: 20px;
+  margin: 0;
 }
 
 .create-startup-form label,
@@ -293,6 +308,14 @@ p {
   background: #ffffff;
   color: var(--ink);
   padding: 11px 12px;
+}
+
+.create-startup-form .primary-button {
+  min-width: 140px;
+}
+
+.create-startup-form .form-error {
+  grid-column: 1 / -1;
 }
 
 .startup-list {
@@ -564,6 +587,13 @@ p {
   margin-top: 18px;
 }
 
+.chat-panel .message-list {
+  max-height: min(58vh, 620px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 8px;
+}
+
 .message-list {
   display: grid;
   gap: 12px;
@@ -594,9 +624,55 @@ p {
   font-weight: 900;
 }
 
-.chat-message p:last-child {
-  margin-bottom: 0;
+.message-content {
+  overflow-wrap: anywhere;
   line-height: 1.5;
+}
+
+.message-content > :first-child {
+  margin-top: 0;
+}
+
+.message-content > :last-child {
+  margin-bottom: 0;
+}
+
+.message-content p {
+  margin: 0 0 12px;
+}
+
+.message-content ol,
+.message-content ul {
+  margin: 0 0 12px;
+  padding-left: 24px;
+}
+
+.message-content li {
+  margin: 8px 0;
+}
+
+.message-content h1,
+.message-content h2,
+.message-content h3,
+.message-content h4 {
+  margin: 18px 0 8px;
+  line-height: 1.25;
+}
+
+.message-content pre {
+  overflow-x: auto;
+  margin: 12px 0;
+  border-radius: 6px;
+  background: var(--surface-muted);
+  padding: 12px;
+}
+
+.message-content code {
+  overflow-wrap: anywhere;
+}
+
+.message-content-plain {
+  white-space: pre-wrap;
 }
 
 .chat-empty,
@@ -689,6 +765,29 @@ p {
 
   .workspace-layout {
     grid-template-columns: 1fr;
+  }
+
+  .create-startup-form {
+    grid-template-columns: 1fr;
+  }
+
+  .create-startup-form .primary-button,
+  .create-startup-form .form-error {
+    grid-column: auto;
+  }
+
+  .startup-create-bar {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .startup-sidebar {
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .workspace-main {
+    grid-column: auto;
   }
 
   .stage-stepper {

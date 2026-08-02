@@ -35,7 +35,7 @@ API routes (app/api/routes.py)
 
 Decision from `hs:brainstorm`: use wrapper-based instrumentation plus a thin turn-level recorder, all via composition. `orchestrator.py` itself is not modified.
 
-- `InstrumentedChatClient` implements the existing `ChatCompletionClient` protocol and wraps `OpenRouterChatClient`.
+- `InstrumentedChatClient` implements the existing `ChatCompletionClient` protocol and wraps `OpenAICompatibleChatClient`.
 - `InstrumentedToolDispatcher` wraps `ToolDispatcher` by composition, keying off the dispatcher's existing structured result shape.
 - `InstrumentedAgentOrchestrator` wraps `AgentOrchestrator` by composition, holding a real `AgentOrchestrator` instance, calling `handle_turn()` on it, timing the call, and reading `startup_id`/`session_id`/`stage` from the same `StartupContext`/`OrchestratorResult` the route already has. It is explicitly **not** a subclass and does not thread new data through `AgentOrchestrator` internals.
 
@@ -51,7 +51,7 @@ Every `handle_turn()` call should produce a durable, structured record of: which
 ### 3.2 LLM cost/token tracking per stage
 Every `create_chat_completion()` call should record `prompt_tokens`, `completion_tokens`, `total_tokens` (from the response's `usage` field — note `orchestrator.py`'s existing `_get()` helper already handles the dict-vs-object duality the OpenAI/OpenRouter SDK response can take; the instrumentation should reuse that same duality-safe access pattern rather than assuming one shape), model name, and a derived `cost_usd`.
 
-`OPENROUTER_MODEL` is currently an unset placeholder (coaching-harness handoff, Known TODOs). Cost tracking cannot hardcode a per-model price implicitly. Use a small, explicit pricing table in `app/services/agentops/pricing.py`, controlled by `Settings`, keyed by model slug, with `cost_usd = null` + a `pricing_unknown` flag when the running model isn't in the table — never silently reported as `$0`.
+`LLM_MODEL` is currently an unset placeholder. Cost tracking cannot hardcode a per-model price implicitly. Use a small, explicit pricing table in `app/services/agentops/pricing.py`, controlled by `Settings`, keyed by model ID, with `cost_usd = null` + a `pricing_unknown` flag when the running model isn't in the table — never silently reported as `$0`.
 
 ### 3.3 Tool-call latency instrumentation
 Every `ToolDispatcher.execute()` call should record latency, `tool_name`, `current_stage`, and outcome (`ok` / `tool_not_available_for_stage` / validation error / persistence error) — the existing structured `{"ok": bool, ...}` return shape already distinguishes these cleanly; instrumentation should key off `result["ok"]` and `result["error"]["type"]` rather than re-deriving status another way.
@@ -173,7 +173,7 @@ All new service errors should follow the project's established recoverable-struc
 
 | File | Change |
 |---|---|
-| `app/api/dependencies.py` | No changes — `get_chat_client()` keeps returning the raw `OpenRouterChatClient`. |
+| `app/api/dependencies.py` | `get_chat_client()` returns the raw `OpenAICompatibleChatClient`. |
 | `app/api/routes.py` (`chat()`) | Once `turn_id`/`startup_id`/`session_id`/`stage` are known, the raw chat client is wrapped, `ToolDispatcher(document_service=document_service)` construction is wrapped with an instrumented variant, and `AgentOrchestrator(...)` construction is wrapped by `InstrumentedAgentOrchestrator` at the route level. |
 | `app/services/orchestrator.py` | **No changes** — wrapped via composition at the route level. |
 | `app/llm/openrouter.py` | No changes to retry/backoff logic itself — only wrapped, not modified. Preserve the existing transient-vs-non-transient distinction (`APITimeoutError`/`APIConnectionError`/`RateLimitError`/transient `APIStatusError` retried; 401/400 not retried) untouched. |

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
 
     app_environment: str = Field(default="local", alias="APP_ENV")
 
+    llm_provider: str = Field(default="9router", alias="LLM_PROVIDER")
+    llm_api_key: str = Field(default="", alias="LLM_API_KEY")
+    llm_base_url: str = Field(default="", alias="LLM_BASE_URL")
+    llm_model: str = Field(default="", alias="LLM_MODEL")
+    llm_max_tokens: int = Field(default=4096, alias="LLM_MAX_TOKENS")
+
     llm_proxy_api_key: str = Field(
         default="",
         alias="LLM_PROXY_API_KEY",
@@ -36,7 +42,7 @@ class Settings(BaseSettings):
         alias="LLM_PROXY_MODEL",
     )
     llm_proxy_max_tokens: int = Field(
-        default=1024,
+        default=4096,
         alias="LLM_PROXY_MAX_TOKENS",
     )
 
@@ -49,7 +55,7 @@ class Settings(BaseSettings):
         default="replace-with-openrouter-model-slug",
         alias="OPENROUTER_MODEL",
     )
-    openrouter_max_tokens: int = Field(default=1024, alias="OPENROUTER_MAX_TOKENS")
+    openrouter_max_tokens: int = Field(default=4096, alias="OPENROUTER_MAX_TOKENS")
     openrouter_http_referer: str = Field(
         default="http://localhost:8000",
         alias="OPENROUTER_HTTP_REFERER",
@@ -73,27 +79,36 @@ class Settings(BaseSettings):
     )
 
     @model_validator(mode="after")
-    def validate_llm_proxy_configuration(self) -> "Settings":
-        if not self.llm_proxy_api_key.strip():
-            self.llm_proxy_api_key = self.openrouter_api_key
-        if not self.llm_proxy_model.strip():
-            self.llm_proxy_model = self.openrouter_model
-        if (
-            "llm_proxy_max_tokens" not in self.model_fields_set
-            and self.openrouter_max_tokens != 1024
-        ):
-            self.llm_proxy_max_tokens = self.openrouter_max_tokens
-        if not self.llm_proxy_base_url.strip():
+    def validate_llm_configuration(self) -> "Settings":
+        if "llm_api_key" not in self.model_fields_set and self.llm_proxy_api_key.strip():
+            self.llm_api_key = self.llm_proxy_api_key or self.openrouter_api_key
+        if "llm_api_key" not in self.model_fields_set and not self.llm_api_key.strip():
+            self.llm_api_key = self.openrouter_api_key
+        if "llm_model" not in self.model_fields_set and self.llm_proxy_model.strip():
+            self.llm_model = self.llm_proxy_model or self.openrouter_model
+        if "llm_model" not in self.model_fields_set and not self.llm_model.strip():
+            self.llm_model = self.openrouter_model
+        if "llm_max_tokens" not in self.model_fields_set:
+            if "llm_proxy_max_tokens" in self.model_fields_set:
+                self.llm_max_tokens = self.llm_proxy_max_tokens
+            elif self.openrouter_max_tokens != 4096:
+                self.llm_max_tokens = self.openrouter_max_tokens
+        if "llm_base_url" not in self.model_fields_set:
+            if "llm_proxy_base_url" in self.model_fields_set and self.llm_proxy_base_url.strip():
+                self.llm_base_url = self.llm_proxy_base_url
+            elif "openrouter_base_url" in self.model_fields_set:
+                self.llm_base_url = self.openrouter_base_url
+        if not self.llm_base_url.strip():
             if self.app_environment.strip().lower() == "local":
-                self.llm_proxy_base_url = "http://localhost:20128/v1"
+                self.llm_base_url = "http://localhost:20128/v1"
             else:
-                raise ValueError("LLM_PROXY_BASE_URL is required when APP_ENV is not local.")
-        self.llm_proxy_base_url = self.llm_proxy_base_url.strip().rstrip("/")
+                raise ValueError("LLM_BASE_URL is required when APP_ENV is not local.")
+        self.llm_base_url = self.llm_base_url.strip().rstrip("/")
         if self.app_environment.strip().lower() != "local":
-            effective_model = self.llm_proxy_model.strip()
+            effective_model = self.llm_model.strip()
             if not effective_model or effective_model in MODEL_PLACEHOLDERS:
                 raise ValueError(
-                    "LLM_PROXY_MODEL must be explicitly configured when APP_ENV is not local."
+                    "LLM_MODEL must be explicitly configured when APP_ENV is not local."
                 )
         return self
 

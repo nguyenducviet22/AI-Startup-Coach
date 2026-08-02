@@ -1,0 +1,154 @@
+name: Frontend CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci-cd.yml"
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-ci-cd.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  frontend-quality:
+    name: Typecheck, test, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+      - name: Run tests
+        working-directory: frontend
+        run: npm test
+      - name: Create production build
+        working-directory: frontend
+        run: npm run build
+
+  gitleaks:
+    name: Secret scan (Gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+
+  codeql:
+    name: SAST (CodeQL JavaScript/TypeScript)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4
+        with:
+          languages: javascript-typescript
+          build-mode: none
+          queries: security-extended
+      - name: Analyze and upload SARIF
+        uses: github/codeql-action/analyze@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4
+        with:
+          category: /language:javascript-typescript
+          output: codeql-results
+          upload: false
+      - name: Upload CodeQL SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4
+        with:
+          sarif_file: codeql-results
+          category: codeql-frontend
+      - name: Fail on HIGH or CRITICAL CodeQL alerts
+        run: |
+          sarif_file="$(find codeql-results -type f -name '*.sarif' -print -quit)"
+          test -n "$sarif_file" || { echo "CodeQL did not produce a SARIF file."; exit 1; }
+          # CodeQL security-severity bands define HIGH/CRITICAL as 7.0 and above.
+          high_critical_count="$(jq '[.runs[] as $run | $run.results[] as $result | ($run.tool.driver.rules[$result.ruleIndex].properties["security-severity"] // "0" | tonumber) | select(. >= 7)] | length' "$sarif_file")"
+          test "$high_critical_count" -eq 0 || { echo "CodeQL found $high_critical_count HIGH/CRITICAL finding(s)."; exit 1; }
+
+  trivy:
+    name: Dependency and config scan (Trivy)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Create Trivy SARIF report
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig
+          format: sarif
+          output: trivy-results.sarif
+          exit-code: "0"
+      - name: Upload Trivy SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4
+        with:
+          sarif_file: trivy-results.sarif
+          category: trivy-frontend
+      - name: Fail on HIGH or CRITICAL Trivy findings
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+
+  deploy:
+    name: Deploy frontend
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [frontend-quality, gitleaks, codeql, trivy]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: production
+    permissions: {}
+    env:
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}
+    steps:
+      - name: Trigger Render deploy
+        # The hook URL is copied from the frontend service's Render Dashboard settings
+        # and stored as a production-environment GitHub Actions secret.
+        run: curl --fail --show-error --silent --retry 3 --retry-all-errors --data "" "$RENDER_DEPLOY_HOOK_URL"
+      - name: Publish pipeline summary
+        run: |
+          {
+            echo "## Frontend deployment triggered"
+            echo
+            echo "Render received the deploy-hook request after all CI and security gates passed."
+          } >> "$GITHUB_STEP_SUMMARY"

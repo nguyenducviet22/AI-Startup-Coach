@@ -1,4 +1,5 @@
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 
@@ -8,6 +9,9 @@ from app.services.context_builder import StartupContext, build_context_messages
 from app.services.skill_loader import SkillLoader
 from app.services.stage_tools import get_openai_tools_for_stage
 from app.services.tool_dispatcher import ToolDispatcher
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -70,6 +74,13 @@ class AgentOrchestrator:
             response = await self.chat_client.create_chat_completion(messages=messages, tools=tools)
             assistant_message = _first_assistant_message(response)
             tool_calls = _message_tool_calls(assistant_message)
+            first_content = _message_content(assistant_message)
+            logger.info(
+                "LLM first response: content_is_none=%s content_length=%s tool_calls=%s",
+                first_content is None,
+                len(first_content or ""),
+                [_tool_call_name(tool_call) for tool_call in tool_calls],
+            )
             tool_messages: list[dict[str, Any]] = []
             tool_call_data: list[dict[str, Any]] = []
 
@@ -95,6 +106,12 @@ class AgentOrchestrator:
 
                 response = await self.chat_client.create_chat_completion(messages=messages)
                 assistant_message = _first_assistant_message(response)
+                final_content = _message_content(assistant_message)
+                logger.info(
+                    "LLM second response: content_is_none=%s content_length=%s",
+                    final_content is None,
+                    len(final_content or ""),
+                )
 
             return OrchestratorResult(
                 content=_message_content(assistant_message) or "",

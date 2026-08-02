@@ -44,13 +44,13 @@ class OpenRouterChatClient:
         self.settings = settings or get_settings()
         # 9Router uses the model identifier configured in its dashboard, commonly
         # in provider/model form (for example, openai/gpt-4o).
-        self.model = self.settings.llm_proxy_model or self.settings.openrouter_model
+        self.model = self.settings.llm_model
         self.max_retries = self.settings.llm_max_retries
         self.backoff_seconds = self.settings.llm_retry_backoff_seconds
         self._sleep = sleep
         self._client = client or AsyncOpenAI(
-            api_key=self.settings.llm_proxy_api_key or self.settings.openrouter_api_key,
-            base_url=self.settings.llm_proxy_base_url,
+            api_key=self.settings.llm_api_key,
+            base_url=self.settings.llm_base_url,
             default_headers=self._default_headers(),
         )
 
@@ -64,7 +64,7 @@ class OpenRouterChatClient:
         request: dict[str, Any] = {
             "model": model or self.model,
             "messages": messages,
-            "max_tokens": self.settings.llm_proxy_max_tokens,
+            "max_tokens": self.settings.llm_max_tokens,
         }
         if tools is not None:
             request["tools"] = tools

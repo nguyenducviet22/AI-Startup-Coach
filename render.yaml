@@ -1,0 +1,73 @@
+# Render Blueprint for the production backend, frontend, and managed database.
+# Review the names/region before applying; the Stage 1 deploy-hook secrets must
+# belong to the two web services named below.
+databases:
+  - name: ai-startup-coach-db
+    databaseName: coaching
+    user: coaching
+    plan: basic-256mb
+    region: singapore
+
+services:
+  - type: web
+    name: ai-startup-coach-backend
+    runtime: python
+    region: singapore
+    plan: starter
+    autoDeploy: false
+    rootDir: .
+    buildCommand: pip install .
+    preDeployCommand: alembic upgrade head
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ai-startup-coach-db
+          property: connectionString
+      - key: LLM_PROVIDER
+        value: 9router
+      - key: LLM_API_KEY
+        sync: false
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_MAX_TOKENS
+        value: "1024"
+      - key: LLM_TIMEOUT_SECONDS
+        value: "30"
+      - key: LLM_SUPPORTS_TOOLS
+        value: "true"
+      - key: LLM_HTTP_REFERER
+        sync: false
+      - key: LLM_X_TITLE
+        value: AI Startup Coach
+      - key: CHAT_HISTORY_LIMIT
+        value: "20"
+      - key: LLM_MAX_RETRIES
+        value: "2"
+      - key: LLM_RETRY_BACKOFF_SECONDS
+        value: "1.0"
+      - key: AGENTOPS_PRICING_ENABLED
+        value: "true"
+      - key: JWT_SECRET
+        sync: false
+      - key: JWT_ALGORITHM
+        value: HS256
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: "7"
+
+  - type: web
+    name: ai-startup-coach-frontend
+    runtime: static
+    region: singapore
+    autoDeploy: false
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        sync: false

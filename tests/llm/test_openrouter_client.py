@@ -53,7 +53,7 @@ async def test_openrouter_client_sends_configured_model_messages_and_tools() -> 
         {
             "model": "configured-model",
             "messages": [{"role": "user", "content": "hello"}],
-            "max_tokens": 1024,
+                "max_tokens": 4096,
             "tools": [{"type": "function", "function": {"name": "check_stage_readiness"}}],
         }
     ]
@@ -156,6 +156,7 @@ def test_openrouter_client_constructs_sdk_client_from_settings(monkeypatch: pyte
 
 def _settings(llm_max_retries: int = 2) -> Settings:
     return Settings(
+        _env_file=None,
         DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/coaching",
         LLM_PROXY_API_KEY="test-key",
         LLM_PROXY_BASE_URL="https://openrouter.test/api/v1",

@@ -49,6 +49,25 @@ async def test_orchestrator_calls_llm_with_stage_filtered_tools() -> None:
     assert "skill for idea" in client.requests[0]["messages"][0]["content"]
 
 
+async def test_orchestrator_preserves_markdown_and_newlines_from_llm() -> None:
+    content = (
+        "Great start with SkillBridge!\n\n"
+        "1. **Origin**  \n"
+        "   Where did this idea come from?\n\n"
+        "What inspired you to create SkillBridge?"
+    )
+    client = FakeChatClient([_response(content)])
+    orchestrator = AgentOrchestrator(chat_client=client, skill_loader=FakeSkillLoader(), settings=_settings())
+
+    result = await orchestrator.handle_message(
+        startup=StartupContext("startup-1", "user-1", "idea", "SkillBridge"),
+        history=[],
+        user_message="I want to help students build skills.",
+    )
+
+    assert result == content
+
+
 async def test_orchestrator_handles_tool_calls_and_returns_final_response() -> None:
     client = FakeChatClient(
         [
