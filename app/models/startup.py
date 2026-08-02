@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, String, text
+from sqlalchemy import DateTime, ForeignKey, String, func, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -34,6 +34,7 @@ class Startup(Base):
     updated_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         server_default=text("now()"),
+        onupdate=func.now(),
     )
 
     user = relationship("User", back_populates="startups")

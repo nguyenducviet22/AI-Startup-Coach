@@ -1,11 +1,11 @@
 import uuid
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_chat_client, get_current_user, require_startup_owner
+from app.api.dependencies import get_chat_client, get_local_user, require_startup_owner
 from app.api.schemas import (
     AuthLoginRequest,
     AuthLogoutRequest,
@@ -19,9 +19,14 @@ from app.api.schemas import (
     CreateStartupRequest,
     DocumentHistoryResponse,
     DocumentResponse,
+    LocalProfileResponse,
     SetStageRequest,
     StartupListResponse,
+    StartupOverviewResponse,
+    StartupReportResponse,
     StartupResponse,
+    UpdateLocalProfileRequest,
+    UpdateStartupRequest,
 )
 from app.core.config import Settings, get_settings
 from app.db.session import get_db_session
@@ -32,7 +37,13 @@ from app.models.user import User
 from app.services.auth_service import AuthService, AuthServiceError
 from app.services.chat_service import ChatService, ChatServiceError
 from app.services.context_builder import StartupContext
-from app.services.document_service import DocumentService, UnknownDocumentTypeError
+from app.services.document_service import (
+    DocumentService,
+    DocumentVersionNotFoundError,
+    UnknownDocumentTypeError,
+)
+from app.services.document_export_service import DocumentExportService
+from app.services.local_profile_service import LocalProfileService
 from app.services.agentops.instrumented_chat_client import InstrumentedChatClient
 from app.services.agentops.instrumented_orchestrator import InstrumentedAgentOrchestrator
 from app.services.agentops.instrumented_tool_dispatcher import InstrumentedToolDispatcher
@@ -44,6 +55,8 @@ from app.services.startup_service import (
     UserNotFoundError,
     startup_to_dict,
 )
+from app.services.startup_overview_service import StartupOverviewService
+from app.services.startup_report_service import ReportSectionSelectionError, StartupReportService
 from app.services.tool_dispatcher import ToolDispatcher
 
 router = APIRouter()
@@ -110,6 +123,21 @@ async def logout(
         raise _auth_http_exception(exc) from exc
 
 
+@router.get("/profile", response_model=LocalProfileResponse)
+async def get_local_profile(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    return await LocalProfileService(session).get_or_create_profile()
+
+
+@router.put("/profile", response_model=LocalProfileResponse)
+async def update_local_profile(
+    request: UpdateLocalProfileRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    return await LocalProfileService(session).update_profile(request.name)
+
+
 @router.post(
     "/startups",
     response_model=StartupResponse,
@@ -118,7 +146,7 @@ async def logout(
 async def create_startup(
     request: CreateStartupRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_local_user)],
 ) -> dict[str, Any]:
     try:
         return await StartupService(session).create_startup(
@@ -132,7 +160,7 @@ async def create_startup(
 @router.get("/startups", response_model=StartupListResponse)
 async def list_startups(
     session: Annotated[AsyncSession, Depends(get_db_session)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_local_user)],
 ) -> dict[str, Any]:
     startups = await StartupService(session).list_startups_for_user(current_user.id)
     return {"startups": startups}
@@ -143,6 +171,73 @@ async def get_startup(
     startup: Annotated[Startup, Depends(require_startup_owner)],
 ) -> dict[str, Any]:
     return startup_to_dict(startup)
+
+
+@router.patch("/startups/{startup_id}", response_model=StartupResponse)
+async def rename_startup(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    request: UpdateStartupRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    return await StartupService(session).rename_startup(startup.id, request.name)
+
+
+@router.get("/startups/{startup_id}/overview", response_model=StartupOverviewResponse)
+async def get_startup_overview(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    return await StartupOverviewService(session).get_overview(startup.id)
+
+
+@router.get("/startups/{startup_id}/report", response_model=StartupReportResponse)
+async def get_startup_report(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    return await StartupReportService(session).get_report(startup.id)
+
+
+@router.get("/startups/{startup_id}/report/export")
+async def export_startup_report(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    format: Literal["pdf", "docx"] = Query("pdf"),
+    sections: str | None = Query(None),
+) -> Response:
+    service = StartupReportService(session)
+    report = await service.get_report(startup.id)
+    requested = [item.strip() for item in sections.split(",") if item.strip()] if sections is not None else None
+    try:
+        selected = service.select_sections(report, requested)
+    except ReportSectionSelectionError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+    if not selected:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No report sections are available to export.")
+    exported = DocumentExportService().export_report(
+        startup_name=report["startup_name"],
+        sections=selected,
+        file_format=format,
+    )
+    return Response(content=exported.content, media_type=exported.media_type, headers={"Content-Disposition": f'attachment; filename="{exported.filename}"'})
+
+
+@router.get("/startups/{startup_id}/pitch-deck/export")
+async def export_pitch_deck(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    format: Literal["pdf"] = Query("pdf"),
+) -> Response:
+    funding = await DocumentService(session).get_current_document(startup_id=startup.id, doc_type="funding")
+    raw_slides = funding["content"].get("pitch_outline") if funding is not None else None
+    slides = [slide for slide in raw_slides if isinstance(slide, dict)] if isinstance(raw_slides, list) else []
+    if not slides:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No pitch outline is available to export.")
+    exported = DocumentExportService().export_pitch_deck(
+        startup_name=startup.name or "Startup chưa đặt tên",
+        slides=slides,
+    )
+    return Response(content=exported.content, media_type=exported.media_type, headers={"Content-Disposition": f'attachment; filename="{exported.filename}"'})
 
 
 @router.post("/startups/{startup_id}/chat", response_model=ChatResponse)
@@ -309,6 +404,60 @@ async def get_document_history(
     except UnknownDocumentTypeError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return {"documents": documents}
+
+
+@router.post(
+    "/startups/{startup_id}/documents/{doc_type}/versions/{version}/restore",
+    response_model=DocumentResponse,
+)
+async def restore_document_version(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    doc_type: str,
+    version: Annotated[int, Path(ge=1)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+) -> dict[str, Any]:
+    try:
+        return await DocumentService(session).restore_document_version(
+            startup_id=startup.id,
+            doc_type=doc_type,
+            version=version,
+        )
+    except UnknownDocumentTypeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except DocumentVersionNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+
+
+@router.get("/startups/{startup_id}/documents/{doc_type}/export")
+async def export_document(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    doc_type: str,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    format: Literal["pdf", "docx"] = Query("pdf"),
+) -> Response:
+    try:
+        document = await DocumentService(session).get_current_document(
+            startup_id=startup.id,
+            doc_type=doc_type,
+        )
+        if document is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No current '{doc_type}' document was found for startup '{startup.id}'.",
+            )
+        exported = DocumentExportService().export(
+            startup_name=startup.name or "Startup chưa đặt tên",
+            doc_type=doc_type,
+            content=document["content"],
+            file_format=format,
+        )
+    except UnknownDocumentTypeError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return Response(
+        content=exported.content,
+        media_type=exported.media_type,
+        headers={"Content-Disposition": f'attachment; filename="{exported.filename}"'},
+    )
 
 
 @router.post("/startups/{startup_id}/advance-stage", response_model=StartupResponse)

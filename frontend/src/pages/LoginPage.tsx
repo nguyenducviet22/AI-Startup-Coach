@@ -1,7 +1,9 @@
 import { FormEvent, useState } from "react";
 
 import { AuthSwitchLink } from "../App";
+import { PasswordField } from "../components/PasswordField";
 import { useAuthStore } from "../stores/authStore";
+import { useToastStore } from "../stores/toastStore";
 
 export function LoginPage() {
   const login = useAuthStore((state) => state.login);
@@ -10,6 +12,7 @@ export function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const showToast = useToastStore((state) => state.showToast);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -17,13 +20,14 @@ export function LoginPage() {
     clearError();
     try {
       await login(email, password);
+      showToast("Đăng nhập thành công. Chào mừng bạn quay lại!", "success");
     } catch {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <AuthPage title="Welcome back" subtitle="Sign in to continue your coaching session.">
+    <AuthPage title="Chào mừng trở lại" subtitle="Đăng nhập để tiếp tục hành trình xây dựng startup của bạn.">
       <form className="auth-form" onSubmit={onSubmit}>
         <label>
           Email
@@ -36,19 +40,12 @@ export function LoginPage() {
           />
         </label>
         <label>
-          Password
-          <input
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            minLength={8}
-          />
+          Mật khẩu
+          <PasswordField value={password} onChange={setPassword} autoComplete="current-password" />
         </label>
         {error ? <p className="form-error">{error}</p> : null}
         <button type="submit" className="primary-button" disabled={isSubmitting}>
-          {isSubmitting ? "Signing in..." : "Sign in"}
+          {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
         </button>
       </form>
       <AuthSwitchLink mode="login" />
@@ -67,14 +64,33 @@ export function AuthPage({
 }) {
   return (
     <main className="auth-page">
-      <section className="auth-panel" aria-labelledby="auth-title">
-        <div className="brand-mark" aria-hidden="true">
-          AI
+      <section className="auth-shell" aria-labelledby="auth-title">
+        <div className="auth-brand-panel" aria-hidden="true">
+          <div className="brand-lockup brand-lockup-inverse">
+            <div className="brand-mark">DL</div>
+            <strong>AI Startup Coach</strong>
+          </div>
+          <div className="auth-brand-message">
+            <p className="eyebrow">Từ ý tưởng đến kế hoạch</p>
+            <h2>Xây startup từng bước, với một người đồng hành luôn sẵn sàng.</h2>
+            <p>Khám phá vấn đề, kiểm chứng mô hình và hoàn thiện tài liệu trong một không gian làm việc rõ ràng.</p>
+          </div>
+          <div className="journey-preview">
+            <span>01 · Ý tưởng</span><span>02 · Mô hình</span><span>03 · Sản phẩm</span><span>04 · Gọi vốn</span>
+          </div>
         </div>
-        <p className="eyebrow">AI Startup Coach</p>
-        <h1 id="auth-title">{title}</h1>
-        <p className="auth-subtitle">{subtitle}</p>
-        {children}
+        <div className="auth-form-panel">
+          <div className="auth-mobile-brand">
+            <div className="brand-mark" aria-hidden="true">DL</div>
+            <strong>AI Startup Coach</strong>
+          </div>
+          <div className="auth-form-content">
+            <p className="eyebrow">AI Startup Coach</p>
+            <h1 id="auth-title">{title}</h1>
+            <p className="auth-subtitle">{subtitle}</p>
+            {children}
+          </div>
+        </div>
       </section>
     </main>
   );

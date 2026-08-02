@@ -14,9 +14,9 @@ export const DOCUMENT_LABELS: Record<DocumentType, string> = {
   lean_canvas: "Lean Canvas",
   bmc: "Business Model Canvas",
   swot: "SWOT",
-  product_plan: "Product Plan",
-  marketing: "Marketing",
-  funding: "Funding"
+  product_plan: "Kế hoạch sản phẩm",
+  marketing: "Kế hoạch tiếp thị",
+  funding: "Kế hoạch gọi vốn"
 };
 
 export function stageToDocumentType(stage: StageName): DocumentType | null {

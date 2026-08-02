@@ -34,6 +34,13 @@ export async function createStartup(name: string | null): Promise<Startup> {
   });
 }
 
+export async function renameStartup(startupId: string, name: string): Promise<Startup> {
+  return apiRequest<Startup>(`/startups/${startupId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ name })
+  });
+}
+
 export async function advanceStartupStage(startupId: string): Promise<Startup> {
   return apiRequest<Startup>(`/startups/${startupId}/advance-stage`, {
     method: "POST"

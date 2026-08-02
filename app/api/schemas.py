@@ -17,6 +17,23 @@ class CreateStartupRequest(BaseModel):
     name: OptionalName | None = None
 
 
+class UpdateStartupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: OptionalName
+
+
+class LocalProfileResponse(BaseModel):
+    name: str
+    configured: bool
+
+
+class UpdateLocalProfileRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]
+
+
 class StartupResponse(BaseModel):
     id: UUID
     user_id: UUID
@@ -111,6 +128,43 @@ class DocumentResponse(BaseModel):
 
 class DocumentHistoryResponse(BaseModel):
     documents: list[DocumentResponse]
+
+
+class DocumentProgressResponse(BaseModel):
+    doc_type: str
+    exists: bool
+    version: int | None
+    updated_at: str | None
+
+
+class RecentDocumentUpdateResponse(BaseModel):
+    doc_type: str
+    version: int
+    updated_at: str | None
+
+
+class StartupOverviewResponse(BaseModel):
+    current_stage: StageName
+    journey_completed_steps: int
+    journey_total_steps: int
+    completed_documents: int
+    total_documents: int
+    total_versions: int
+    documents: list[DocumentProgressResponse]
+    recent_updates: list[RecentDocumentUpdateResponse]
+
+
+class ReportSectionResponse(BaseModel):
+    key: str
+    title: str
+    available: bool
+    content: dict[str, Any]
+
+
+class StartupReportResponse(BaseModel):
+    startup_id: UUID
+    startup_name: str
+    sections: list[ReportSectionResponse]
 
 
 class SetStageRequest(BaseModel):

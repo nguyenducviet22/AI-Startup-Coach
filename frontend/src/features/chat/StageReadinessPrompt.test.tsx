@@ -15,9 +15,9 @@ describe("StageReadinessPrompt", () => {
       />
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Advance to Business Model" }));
+    await userEvent.click(screen.getByRole("button", { name: "Tiếp tục đến Mô hình kinh doanh" }));
 
-    expect(screen.getByText("Ready for the next stage")).toBeInTheDocument();
+    expect(screen.getByText("Sẵn sàng cho giai đoạn tiếp theo")).toBeInTheDocument();
     expect(onAdvanceStage).toHaveBeenCalledOnce();
   });
 
@@ -30,9 +30,9 @@ describe("StageReadinessPrompt", () => {
       />
     );
 
-    expect(screen.getByText("More context needed")).toBeInTheDocument();
-    expect(screen.getByText("customer_segments")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /advance/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Cần thêm thông tin")).toBeInTheDocument();
+    expect(screen.getByText("Phân khúc khách hàng")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /tiếp tục/i })).not.toBeInTheDocument();
   });
 
   it("does not render in the completed stage", () => {

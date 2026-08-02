@@ -1,8 +1,10 @@
 import { FormEvent, useState } from "react";
 
 import { AuthSwitchLink } from "../App";
+import { PasswordField } from "../components/PasswordField";
 import { AuthPage } from "./LoginPage";
 import { useAuthStore } from "../stores/authStore";
+import { useToastStore } from "../stores/toastStore";
 
 export function SignupPage() {
   const signup = useAuthStore((state) => state.signup);
@@ -12,6 +14,7 @@ export function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const showToast = useToastStore((state) => state.showToast);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -19,16 +22,17 @@ export function SignupPage() {
     clearError();
     try {
       await signup(name, email, password);
+      showToast("Tạo tài khoản thành công. Hãy bắt đầu với ý tưởng đầu tiên!", "success");
     } catch {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <AuthPage title="Create your account" subtitle="Start a guided path from idea to funding plan.">
+    <AuthPage title="Tạo tài khoản" subtitle="Bắt đầu hành trình có hướng dẫn từ ý tưởng đến kế hoạch gọi vốn.">
       <form className="auth-form" onSubmit={onSubmit}>
         <label>
-          Name
+          Họ và tên
           <input
             type="text"
             autoComplete="name"
@@ -48,19 +52,12 @@ export function SignupPage() {
           />
         </label>
         <label>
-          Password
-          <input
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            required
-            minLength={8}
-          />
+          Mật khẩu
+          <PasswordField value={password} onChange={setPassword} autoComplete="new-password" showStrength />
         </label>
         {error ? <p className="form-error">{error}</p> : null}
         <button type="submit" className="primary-button" disabled={isSubmitting}>
-          {isSubmitting ? "Creating..." : "Create account"}
+          {isSubmitting ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
         </button>
       </form>
       <AuthSwitchLink mode="signup" />

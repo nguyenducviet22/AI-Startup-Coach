@@ -20,6 +20,8 @@ from app.services.document_service import (
     StartupNotFoundError,
     UnknownDocumentTypeError,
 )
+from app.services.startup_overview_service import StartupOverviewService
+from app.services.startup_report_service import StartupReportService
 
 
 @pytest.fixture(scope="module")
@@ -72,6 +74,94 @@ async def test_document_service_creates_new_current_version_without_losing_histo
     assert current["content"]["problem"] == "Lesson coordination is scattered."
     assert [entry["version"] for entry in history] == [2, 1]
     assert [entry["is_current"] for entry in history] == [True, False]
+
+
+async def test_document_service_restores_old_content_as_a_new_current_version(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    startup_id = await _create_startup(session_factory)
+
+    async with session_factory() as session:
+        service = DocumentService(session)
+        await service.save_document(
+            startup_id=startup_id,
+            doc_type="lean_canvas",
+            data=_lean_canvas_payload(problem="Original problem."),
+        )
+        await service.save_document(
+            startup_id=startup_id,
+            doc_type="lean_canvas",
+            data=_lean_canvas_payload(problem="New problem."),
+        )
+
+        restored = await service.restore_document_version(
+            startup_id=startup_id,
+            doc_type="lean_canvas",
+            version=1,
+        )
+        history = await service.get_document_history(startup_id=startup_id, doc_type="lean_canvas")
+
+    assert restored["version"] == 3
+    assert restored["is_current"] is True
+    assert restored["content"]["problem"] == "Original problem."
+    assert [entry["version"] for entry in history] == [3, 2, 1]
+    assert [entry["is_current"] for entry in history] == [True, False, False]
+
+
+async def test_startup_overview_counts_documents_versions_and_recent_updates(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    startup_id = await _create_startup(session_factory)
+    async with session_factory() as session:
+        documents = DocumentService(session)
+        await documents.save_document(
+            startup_id=startup_id,
+            doc_type="lean_canvas",
+            data=_lean_canvas_payload(problem="First."),
+        )
+        await documents.save_document(
+            startup_id=startup_id,
+            doc_type="lean_canvas",
+            data=_lean_canvas_payload(problem="Second."),
+        )
+        await documents.save_document(
+            startup_id=startup_id,
+            doc_type="swot",
+            data={"strengths": ["Fast"], "weaknesses": [], "opportunities": [], "threats": []},
+        )
+        overview = await StartupOverviewService(session).get_overview(startup_id)
+
+    assert overview["journey_completed_steps"] == 1
+    assert overview["journey_total_steps"] == 8
+    assert overview["completed_documents"] == 2
+    assert overview["total_documents"] == 6
+    assert overview["total_versions"] == 3
+    assert [item["doc_type"] for item in overview["recent_updates"]][:2] == ["swot", "lean_canvas"]
+
+
+async def test_startup_report_derives_overview_and_finance_from_current_documents(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    startup_id = await _create_startup(session_factory)
+    async with session_factory() as session:
+        documents = DocumentService(session)
+        await documents.save_document(
+            startup_id=startup_id,
+            doc_type="lean_canvas",
+            data={**_lean_canvas_payload(problem="Students lose focus."), "revenue_streams": "49k/month", "cost_structure": "Hosting"},
+        )
+        report = await StartupReportService(session).get_report(startup_id)
+
+    sections = {section["key"]: section for section in report["sections"]}
+    assert sections["overview"]["available"] is True
+    assert sections["overview"]["content"]["problem"] == "Students lose focus."
+    assert sections["basic_finance"]["available"] is True
+    assert sections["basic_finance"]["content"] == {
+        "revenue_streams": "49k/month",
+        "cost_structure": "Hosting",
+        "marketing_budget": None,
+    }
+    assert sections["swot"]["available"] is False
 
 
 async def test_document_service_serializes_concurrent_writes_to_one_current_row(

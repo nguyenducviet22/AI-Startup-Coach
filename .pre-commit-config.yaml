@@ -1,0 +1,13 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.1
+    hooks:
+      - id: ruff-check
+  - repo: local
+    hooks:
+      - id: frontend-biome
+        name: Frontend Biome lint
+        entry: npm --prefix frontend run lint --
+        language: system
+        files: ^frontend/.*\.(js|jsx|ts|tsx)$
+        pass_filenames: false

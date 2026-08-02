@@ -32,6 +32,13 @@ class UnknownDocumentTypeError(DocumentServiceError):
         self.doc_type = doc_type
 
 
+class DocumentVersionNotFoundError(DocumentServiceError):
+    def __init__(self, doc_type: str, version: int) -> None:
+        super().__init__(f"Version {version} of document '{doc_type}' was not found.")
+        self.doc_type = doc_type
+        self.version = version
+
+
 @dataclass(frozen=True)
 class DocumentSpec:
     model: type
@@ -177,6 +184,56 @@ class DocumentService:
             .order_by(desc(spec.model.version))
         )
         return [_document_to_dict(row, canonical_doc_type, spec) for row in result.scalars().all()]
+
+    async def get_document_version(
+        self,
+        *,
+        startup_id: uuid.UUID | str,
+        doc_type: str,
+        version: int,
+    ) -> dict[str, Any] | None:
+        startup_uuid = _coerce_uuid(startup_id)
+        canonical_doc_type = normalize_doc_type(doc_type)
+        spec = _get_spec(canonical_doc_type)
+        result = await self.session.execute(
+            select(spec.model).where(
+                spec.model.startup_id == startup_uuid,
+                spec.model.version == version,
+            )
+        )
+        row = result.scalar_one_or_none()
+        return None if row is None else _document_to_dict(row, canonical_doc_type, spec)
+
+    async def restore_document_version(
+        self,
+        *,
+        startup_id: uuid.UUID | str,
+        doc_type: str,
+        version: int,
+    ) -> dict[str, Any]:
+        startup_uuid = _coerce_uuid(startup_id)
+        canonical_doc_type = normalize_doc_type(doc_type)
+        spec = _get_spec(canonical_doc_type)
+        source = await self.get_document_version(
+            startup_id=startup_uuid,
+            doc_type=canonical_doc_type,
+            version=version,
+        )
+        if source is None:
+            raise DocumentVersionNotFoundError(canonical_doc_type, version)
+
+        try:
+            restored = await self._insert_version_locked(
+                startup_id=startup_uuid,
+                doc_type=canonical_doc_type,
+                spec=spec,
+                data=source["content"],
+            )
+            await self.session.commit()
+        except Exception:
+            await self.session.rollback()
+            raise
+        return restored
 
     async def _insert_version_locked(
         self,

@@ -11,6 +11,7 @@ from app.db.session import get_db_session
 from app.llm.openrouter import ChatCompletionClient, OpenRouterChatClient
 from app.models.startup import Startup
 from app.models.user import User
+from app.services.local_profile_service import LocalProfileService
 
 
 def get_chat_client() -> ChatCompletionClient:
@@ -43,9 +44,21 @@ async def get_current_user(
     return user
 
 
+async def get_local_user(
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    settings: Annotated[Settings, Depends(get_settings)],
+    authorization: Annotated[str | None, Header()] = None,
+) -> User:
+    # Tokens remain accepted for backwards-compatible API clients, while the
+    # local frontend intentionally sends none and receives the singleton user.
+    if authorization is not None:
+        return await get_current_user(session, settings, authorization)
+    return await LocalProfileService(session).get_or_create_user()
+
+
 async def require_startup_owner(
     startup_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_local_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> Startup:
     result = await session.execute(select(Startup).where(Startup.id == startup_id))

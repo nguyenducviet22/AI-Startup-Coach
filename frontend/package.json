@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "format": "biome format --write src",
+    "format:check": "biome format src",
+    "lint": "biome lint src",
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc -b"
@@ -19,6 +22,7 @@
     "zustand": "^5.0.6"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.6",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",

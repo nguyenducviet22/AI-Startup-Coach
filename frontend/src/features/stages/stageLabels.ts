@@ -13,14 +13,14 @@ export const STAGES: StageName[] = [
 export const ALL_STAGES: StageName[] = [...STAGES, "completed"];
 
 export const STAGE_LABELS: Record<StageName, string> = {
-  idea: "Idea",
+  idea: "Ý tưởng",
   lean_canvas: "Lean Canvas",
-  bmc: "Business Model",
+  bmc: "Mô hình kinh doanh",
   swot: "SWOT",
-  product_plan: "Product Plan",
-  marketing: "Marketing",
-  funding: "Funding",
-  completed: "Completed"
+  product_plan: "Kế hoạch sản phẩm",
+  marketing: "Tiếp thị",
+  funding: "Gọi vốn",
+  completed: "Hoàn thành"
 };
 
 export function nextStageLabel(stage: StageName): string | null {
