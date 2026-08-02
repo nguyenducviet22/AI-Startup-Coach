@@ -22,30 +22,46 @@ export function StageReadinessPrompt({
   const nextLabel = nextStageLabel(currentStage);
   if (readiness.ready && nextLabel) {
     return (
-      <section className="readiness-prompt readiness-ready" aria-label="Stage readiness">
+      <section className="readiness-prompt readiness-ready" aria-label="Mức độ sẵn sàng của giai đoạn">
         <div>
-          <h3>Ready for the next stage</h3>
-          <p>The coach thinks this stage has enough context to move forward.</p>
+          <h3>Sẵn sàng cho giai đoạn tiếp theo</h3>
+          <p>Coach nhận thấy bạn đã cung cấp đủ thông tin để tiếp tục.</p>
         </div>
         <button type="button" className="primary-button" onClick={onAdvanceStage} disabled={isAdvancing}>
-          {isAdvancing ? "Advancing..." : `Advance to ${nextLabel}`}
+          {isAdvancing ? "Đang chuyển..." : `Tiếp tục đến ${nextLabel}`}
         </button>
       </section>
     );
   }
 
   return (
-    <section className="readiness-prompt" aria-label="Stage readiness">
-      <h3>More context needed</h3>
+    <section className="readiness-prompt" aria-label="Mức độ sẵn sàng của giai đoạn">
+      <h3>Cần thêm thông tin</h3>
       {readiness.missing_fields.length > 0 ? (
         <ul>
           {readiness.missing_fields.map((field) => (
-            <li key={field}>{field}</li>
+            <li key={field}>{readinessFieldLabel(field)}</li>
           ))}
         </ul>
       ) : (
-        <p>The coach needs a little more detail before recommending the next stage.</p>
+        <p>Coach cần thêm một vài chi tiết trước khi đề xuất chuyển giai đoạn.</p>
       )}
     </section>
   );
+}
+
+const READINESS_FIELD_LABELS: Record<string, string> = {
+  problem: "Vấn đề khách hàng",
+  customer_segments: "Phân khúc khách hàng",
+  unique_value_proposition: "Giá trị khác biệt",
+  solution: "Giải pháp",
+  channels: "Kênh tiếp cận",
+  revenue_streams: "Dòng doanh thu",
+  cost_structure: "Cơ cấu chi phí",
+  key_metrics: "Chỉ số chính",
+  unfair_advantage: "Lợi thế khó sao chép"
+};
+
+function readinessFieldLabel(field: string): string {
+  return READINESS_FIELD_LABELS[field] ?? field.replaceAll("_", " ");
 }

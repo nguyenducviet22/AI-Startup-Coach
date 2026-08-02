@@ -22,6 +22,7 @@ from app.models.agentops import AgentTurn, LlmCall, ToolCallLog
 from app.main import app
 from app.models.base import Base
 from app.models.chat import ChatMessage, ChatSession
+from app.models.documents import FundingGuide, LeanCanvas
 from app.models.startup import Startup
 from app.models.user import User
 
@@ -697,35 +698,66 @@ async def test_document_routes_reject_unknown_doc_type(
     assert "Unknown document type" in response.json()["detail"]
 
 
-@pytest.mark.parametrize(
-    ("method", "path", "json_body"),
-    [
-        ("POST", "/startups", {"name": "TutorOS"}),
-        ("GET", "/startups", None),
-        ("GET", "/startups/{startup_id}", None),
-        ("POST", "/startups/{startup_id}/chat", {"message": "Hello"}),
-        ("GET", "/startups/{startup_id}/chat/messages", None),
-        ("GET", "/startups/{startup_id}/documents/lean_canvas", None),
-        ("GET", "/startups/{startup_id}/documents/lean_canvas/history", None),
-        ("POST", "/startups/{startup_id}/advance-stage", None),
-        ("PATCH", "/startups/{startup_id}/stage", {"stage": "bmc"}),
-    ],
-)
-async def test_existing_routes_reject_unauthenticated_requests(
-    client: httpx.AsyncClient,
-    method: str,
-    path: str,
-    json_body: dict[str, Any] | None,
-) -> None:
-    startup_id = uuid.uuid4()
-    response = await client.request(
-        method,
-        path.format(startup_id=startup_id),
-        json=json_body,
-    )
+async def test_local_profile_startup_and_rename_work_without_auth(client: httpx.AsyncClient) -> None:
+    initial_profile = await client.get("/profile")
+    assert initial_profile.status_code == 200
+    assert initial_profile.json() == {"name": "", "configured": False}
 
-    assert response.status_code == 401
-    assert response.json()["detail"]["code"] == "missing_token"
+    updated_profile = await client.put("/profile", json={"name": "Nguyễn Thị Nhã Uyên"})
+    assert updated_profile.status_code == 200
+    assert updated_profile.json() == {"name": "Nguyễn Thị Nhã Uyên", "configured": True}
+
+    created = await client.post("/startups", json={"name": "Startup chưa đặt tên"})
+    assert created.status_code == 201
+    startup_id = created.json()["id"]
+
+    renamed = await client.patch(f"/startups/{startup_id}", json={"name": "EcoLearn"})
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "EcoLearn"
+
+    listed = await client.get("/startups")
+    assert listed.status_code == 200
+    assert listed.json()["startups"][0]["name"] == "EcoLearn"
+
+
+async def test_product_depth_routes_restore_overview_report_and_pitch_without_auth(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    startup_id = uuid.UUID((await client.post("/startups", json={"name": "EcoLearn"})).json()["id"])
+    async with session_factory() as session:
+        session.add_all([
+            LeanCanvas(startup_id=startup_id, version=1, is_current=False, problem="Old problem", solution="Old solution", customer_segments="Students"),
+            LeanCanvas(startup_id=startup_id, version=2, is_current=True, problem="Current problem", solution="Current solution", customer_segments="First-year students", revenue_streams="49k/month", cost_structure="Hosting"),
+            FundingGuide(startup_id=startup_id, version=1, is_current=True, pitch_outline=[{"slide_title": "Vấn đề", "content": "Sinh viên khó duy trì lịch học."}], funding_stage_recommendation="Bootstrapped MVP"),
+        ])
+        await session.commit()
+
+    overview = await client.get(f"/startups/{startup_id}/overview")
+    assert overview.status_code == 200
+    assert overview.json()["completed_documents"] == 2
+    assert overview.json()["total_versions"] == 3
+
+    report = await client.get(f"/startups/{startup_id}/report")
+    assert report.status_code == 200
+    sections = {section["key"]: section for section in report.json()["sections"]}
+    assert sections["overview"]["content"]["problem"] == "Current problem"
+    assert sections["basic_finance"]["available"] is True
+
+    report_pdf = await client.get(f"/startups/{startup_id}/report/export", params={"format": "pdf", "sections": "overview,basic_finance"})
+    assert report_pdf.status_code == 200
+    assert report_pdf.content.startswith(b"%PDF-")
+
+    pitch_pdf = await client.get(f"/startups/{startup_id}/pitch-deck/export", params={"format": "pdf"})
+    assert pitch_pdf.status_code == 200
+    assert pitch_pdf.content.startswith(b"%PDF-")
+
+    restored = await client.post(f"/startups/{startup_id}/documents/lean_canvas/versions/1/restore")
+    assert restored.status_code == 200
+    assert restored.json()["version"] == 3
+    assert restored.json()["content"]["problem"] == "Old problem"
+    history = (await client.get(f"/startups/{startup_id}/documents/lean_canvas/history")).json()["documents"]
+    assert [item["is_current"] for item in history] == [True, False, False]
 
 
 @pytest.mark.parametrize(

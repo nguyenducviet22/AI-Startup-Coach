@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import type { StageName } from "../../api/startups";
 import { nextStageLabel, priorStages, STAGE_LABELS } from "./stageLabels";
@@ -24,6 +24,10 @@ export function StageControls({
   const nextLabel = nextStageLabel(currentStage);
   const isCompleted = currentStage === "completed";
 
+  useEffect(() => {
+    setTargetStage(backOptions.at(-1) ?? "");
+  }, [backOptions]);
+
   function handleSetStage(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!targetStage) {
@@ -36,10 +40,11 @@ export function StageControls({
     <section className="workspace-section" aria-labelledby="stage-heading">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Stage</p>
-          <h2 id="stage-heading">{isCompleted ? "Coaching complete" : STAGE_LABELS[currentStage]}</h2>
+          <p className="eyebrow">Lộ trình</p>
+          <h2 id="stage-heading">{isCompleted ? "Hoàn thành hành trình" : STAGE_LABELS[currentStage]}</h2>
+          <p className="section-description">Mỗi giai đoạn giúp bạn kiểm chứng một phần quan trọng của startup.</p>
         </div>
-        {isCompleted ? <span className="status-pill">Completed</span> : null}
+        {isCompleted ? <span className="status-pill">Đã hoàn thành</span> : null}
       </div>
 
       <StageStepper currentStage={currentStage} />
@@ -52,16 +57,16 @@ export function StageControls({
             onClick={onAdvanceStage}
             disabled={isAdvancing}
           >
-            {isAdvancing ? "Advancing..." : `Advance to ${nextLabel}`}
+            {isAdvancing ? "Đang chuyển..." : `Tiếp tục đến ${nextLabel}`}
           </button>
         ) : (
-          <p className="stage-complete-copy">The guided startup coaching path is complete.</p>
+          <p className="stage-complete-copy">Bạn đã hoàn thành lộ trình coaching có hướng dẫn.</p>
         )}
 
         {backOptions.length > 0 ? (
           <form className="set-stage-form" onSubmit={handleSetStage}>
             <label>
-              Go back to
+              Xem lại giai đoạn
               <select
                 value={targetStage}
                 onChange={(event) => setTargetStage(event.target.value as StageName)}
@@ -74,7 +79,7 @@ export function StageControls({
               </select>
             </label>
             <button type="submit" className="secondary-button" disabled={!targetStage || isSettingStage}>
-              {isSettingStage ? "Updating..." : "Set stage"}
+              {isSettingStage ? "Đang cập nhật..." : "Quay lại"}
             </button>
           </form>
         ) : null}

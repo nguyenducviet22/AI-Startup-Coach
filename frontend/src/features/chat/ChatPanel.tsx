@@ -8,8 +8,10 @@ import {
 } from "../../api/chat";
 import type { StageName } from "../../api/startups";
 import { useChatSessionStore } from "../../stores/chatSessionStore";
+import { useWorkspacePreferencesStore } from "../../stores/workspacePreferencesStore";
 import { MessageList } from "./MessageList";
 import { StageReadinessPrompt } from "./StageReadinessPrompt";
+import { useToastStore } from "../../stores/toastStore";
 
 type ChatPanelProps = {
   startupId: string;
@@ -32,8 +34,10 @@ export function ChatPanel({
   const setSessionId = useChatSessionStore((state) => state.setSessionId);
   const queryClient = useQueryClient();
   const sessionId = getSessionId(startupId);
-  const [draft, setDraft] = useState("");
+  const draft = useWorkspacePreferencesStore((state) => state.workspaces[startupId]?.chatDraft ?? "");
+  const updateWorkspace = useWorkspacePreferencesStore((state) => state.updateWorkspace);
   const [readiness, setReadiness] = useState<StageReadiness | null>(null);
+  const showToast = useToastStore((state) => state.showToast);
   const isCompleted = currentStage === "completed";
 
   const historyQuery = useQuery({
@@ -51,8 +55,13 @@ export function ChatPanel({
       setSessionId(startupId, response.session_id);
       setReadiness(response.stage_readiness);
       void queryClient.invalidateQueries({ queryKey: ["chat-messages", startupId, response.session_id] });
-      setDraft("");
-    }
+      void queryClient.invalidateQueries({ queryKey: ["document", startupId] });
+      void queryClient.invalidateQueries({ queryKey: ["document-history", startupId] });
+      void queryClient.invalidateQueries({ queryKey: ["startup-overview", startupId] });
+      void queryClient.invalidateQueries({ queryKey: ["startup-report", startupId] });
+      updateWorkspace(startupId, { chatDraft: "" });
+    },
+    onError: () => showToast("Không thể gửi tin nhắn. Vui lòng thử lại.", "error")
   });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -68,12 +77,13 @@ export function ChatPanel({
     <section className="workspace-section chat-panel" aria-labelledby="chat-heading">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Coach</p>
-          <h2 id="chat-heading">{isCompleted ? "Coaching archive" : "Chat"}</h2>
+          <p className="eyebrow">AI Coach</p>
+          <h2 id="chat-heading">{isCompleted ? "Lịch sử coaching" : "Trò chuyện cùng Coach"}</h2>
+          <p className="section-description">Trao đổi tự nhiên; Coach sẽ tổng hợp thông tin vào tài liệu của bạn.</p>
         </div>
         {!isCompleted && currentDocumentLabel && onOpenCurrentDocument ? (
           <button type="button" className="secondary-button" onClick={onOpenCurrentDocument}>
-            Open {currentDocumentLabel}
+            Mở {currentDocumentLabel}
           </button>
         ) : null}
       </div>
@@ -82,8 +92,8 @@ export function ChatPanel({
 
       {isCompleted ? (
         <div className="completion-summary">
-          <h3>Guided coaching is complete</h3>
-          <p>Chat history stays available here. Use the document views to review and refine generated work.</p>
+          <h3>Hành trình coaching đã hoàn thành</h3>
+          <p>Lịch sử trò chuyện vẫn được lưu tại đây. Bạn có thể xem lại và hoàn thiện các tài liệu đã tạo.</p>
         </div>
       ) : (
         <>
@@ -96,17 +106,17 @@ export function ChatPanel({
 
           <form className="message-composer" onSubmit={handleSubmit}>
             <label>
-              Message
+              Tin nhắn
               <textarea
                 value={draft}
-                onChange={(event) => setDraft(event.target.value)}
+                onChange={(event) => updateWorkspace(startupId, { chatDraft: event.target.value })}
                 rows={4}
-                placeholder="Tell the coach what you know so far..."
+                placeholder="Chia sẻ điều bạn đã biết, câu hỏi hoặc giả định cần kiểm chứng..."
               />
             </label>
             {sendMutation.error ? <p className="form-error">{sendMutation.error.message}</p> : null}
             <button type="submit" className="primary-button" disabled={!draft.trim() || sendMutation.isPending}>
-              {sendMutation.isPending ? "Sending..." : "Send"}
+              {sendMutation.isPending ? "Đang gửi..." : "Gửi tin nhắn"}
             </button>
           </form>
         </>

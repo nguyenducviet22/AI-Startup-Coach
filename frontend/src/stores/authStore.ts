@@ -67,10 +67,20 @@ export const useAuthStore = create<AuthState>((set) => ({
 
 function messageFromError(error: unknown): string {
   if (error instanceof Error) {
-    return error.message;
+    return AUTH_ERROR_MESSAGES[error.message] ?? error.message;
   }
-  return "Something went wrong. Please try again.";
+  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
 }
+
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  "Email is already registered.": "Email này đã được đăng ký.",
+  "Email or password is incorrect.": "Email hoặc mật khẩu không chính xác.",
+  "Refresh token is required.": "Phiên đăng nhập không hợp lệ.",
+  "Refresh token is invalid.": "Phiên đăng nhập không hợp lệ.",
+  "Refresh token has expired.": "Phiên đăng nhập đã hết hạn.",
+  "Refresh token reuse was detected.": "Phiên đăng nhập không còn an toàn. Vui lòng đăng nhập lại.",
+  "Refresh token has been revoked.": "Phiên đăng nhập đã kết thúc."
+};
 
 onAuthFailure(() => {
   useAuthStore.setState({ status: "unauthenticated", user: null, error: null });

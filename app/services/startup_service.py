@@ -65,6 +65,13 @@ class StartupService:
         )
         return [startup_to_dict(startup) for startup in result.scalars().all()]
 
+    async def rename_startup(self, startup_id: uuid.UUID | str, name: str) -> dict[str, Any]:
+        startup = await self.get_startup(startup_id)
+        startup.name = name.strip()
+        await self.session.commit()
+        await self.session.refresh(startup)
+        return startup_to_dict(startup)
+
 
 def startup_to_dict(startup: Startup) -> dict[str, Any]:
     return {

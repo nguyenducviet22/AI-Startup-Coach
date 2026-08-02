@@ -144,7 +144,7 @@ async function parseJson(response: Response): Promise<ApiErrorBody | unknown> {
   return JSON.parse(text) as unknown;
 }
 
-function apiUrl(path: string): string {
+export function apiUrl(path: string): string {
   const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
   return `${baseUrl}${path}`;
 }
