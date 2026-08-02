@@ -116,7 +116,7 @@ export function ChatPanel({
             </label>
             {sendMutation.error ? <p className="form-error">{sendMutation.error.message}</p> : null}
             <button type="submit" className="primary-button" disabled={!draft.trim() || sendMutation.isPending}>
-              {sendMutation.isPending ? "Đang gửi..." : "Gửi tin nhắn"}
+              {sendMutation.isPending ? "Thinking..." : "Gửi tin nhắn"}
             </button>
           </form>
         </>

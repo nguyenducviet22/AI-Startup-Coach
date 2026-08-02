@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -63,6 +63,34 @@ describe("ChatPanel", () => {
     expect(await screen.findByLabelText("Tin nhắn")).toHaveValue("Saved draft");
     await user.click(screen.getByRole("button", { name: "Gửi tin nhắn" }));
     await waitFor(() => expect(useWorkspacePreferencesStore.getState().getWorkspace("startup-1").chatDraft).toBe(""));
+  });
+
+  it("shows Thinking while waiting for the coach response", async () => {
+    const user = userEvent.setup();
+    let resolveSend!: (response: Response) => void;
+    const pendingSend = new Promise<Response>((resolve) => { resolveSend = resolve; });
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ session_id: null, messages: [] }))
+      .mockReturnValueOnce(pendingSend)
+      .mockResolvedValueOnce(jsonResponse({
+        session_id: "session-1",
+        messages: [
+          { role: "user", content: "Kiểm chứng ý tưởng", created_at: null, sequence: 1 },
+          { role: "assistant", content: "Phản hồi", created_at: null, sequence: 2 }
+        ]
+      }));
+
+    renderWithQueryClient(
+      <ChatPanel startupId="startup-1" currentStage="idea" onAdvanceStage={vi.fn()} />
+    );
+
+    const composer = await screen.findByLabelText("Tin nhắn");
+    await user.type(composer, "Kiểm chứng ý tưởng");
+    await user.click(screen.getByRole("button", { name: "Gửi tin nhắn" }));
+
+    expect(await screen.findByRole("button", { name: "Thinking..." })).toBeDisabled();
+    await act(async () => resolveSend(jsonResponse({ session_id: "session-1", message: "Phản hồi", stage_readiness: null })));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Gửi tin nhắn" })).toBeDisabled());
   });
 
   it("hydrates history from the chat messages endpoint", async () => {

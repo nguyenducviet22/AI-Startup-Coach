@@ -11,7 +11,6 @@ from alembic import command
 from alembic.config import Config
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 from testcontainers.community.postgres import PostgresContainer
 
 from app.core.config import ROOT_DIR, Settings, get_settings

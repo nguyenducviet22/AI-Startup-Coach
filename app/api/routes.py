@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_chat_client, get_current_user, get_local_user, require_startup_owner
+from app.api.dependencies import get_chat_client, get_local_user, require_startup_owner
 from app.api.schemas import (
     AuthLoginRequest,
     AuthLogoutRequest,
