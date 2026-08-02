@@ -5,7 +5,7 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import Settings, get_settings
+from app.core.config import MODEL_PLACEHOLDERS, Settings, get_settings
 from app.core.security import TokenExpiredError, TokenInvalidError, decode_access_token
 from app.db.session import get_db_session
 from app.llm.openrouter import ChatCompletionClient, OpenRouterChatClient
@@ -14,8 +14,31 @@ from app.models.user import User
 from app.services.local_profile_service import LocalProfileService
 
 
-def get_chat_client() -> ChatCompletionClient:
-    return OpenRouterChatClient()
+def get_chat_client(
+    settings: Annotated[Settings, Depends(get_settings)],
+    openrouter_api_key: Annotated[
+        str | None,
+        Header(alias="X-OpenRouter-Api-Key", max_length=4096),
+    ] = None,
+) -> ChatCompletionClient:
+    api_key = openrouter_api_key.strip() if openrouter_api_key else ""
+    if not api_key:
+        return OpenRouterChatClient(settings=settings)
+
+    openrouter_model = settings.openrouter_model.strip()
+    if not openrouter_model or openrouter_model in MODEL_PLACEHOLDERS:
+        openrouter_model = "openrouter/auto"
+
+    request_settings = settings.model_copy(
+        update={
+            "llm_provider": "openrouter",
+            "llm_api_key": api_key,
+            "llm_base_url": settings.openrouter_base_url.strip().rstrip("/"),
+            "llm_model": openrouter_model,
+            "llm_max_tokens": settings.openrouter_max_tokens,
+        }
+    )
+    return OpenRouterChatClient(settings=request_settings)
 
 
 async def get_current_user(

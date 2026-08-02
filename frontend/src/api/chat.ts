@@ -1,4 +1,4 @@
-import { apiRequest } from "./client";
+import { apiRequest, getStoredOpenRouterApiKey } from "./client";
 
 export type ChatRole = "user" | "assistant";
 
@@ -46,8 +46,10 @@ export async function sendChatMessage(
   message: string,
   sessionId: string | null
 ): Promise<ChatResponse> {
+  const apiKey = getStoredOpenRouterApiKey();
   return apiRequest<ChatResponse>(`/startups/${startupId}/chat`, {
     method: "POST",
+    headers: apiKey ? { "X-OpenRouter-Api-Key": apiKey } : undefined,
     body: JSON.stringify({
       message,
       session_id: sessionId

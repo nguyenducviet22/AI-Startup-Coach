@@ -23,6 +23,7 @@ import { STAGES, STAGE_LABELS, nextStageLabel } from "../features/stages/stageLa
 import { useToastStore } from "../stores/toastStore";
 import { useWorkspacePreferencesStore, type WorkspaceView } from "../stores/workspacePreferencesStore";
 import { ConfirmationDialog } from "./ConfirmationDialog";
+import { OpenRouterKeyControl } from "./OpenRouterKeyControl";
 import { Skeleton } from "./Skeleton";
 
 type PendingAction = { kind: "advance" } | { kind: "set-stage"; stage: StageName } | null;
@@ -132,6 +133,7 @@ export function AppShell({ profileName }: { profileName: string }) {
       <header className="topbar">
         <strong className="tool-wordmark">AI Startup Coach</strong>
         <div className="account">
+          <OpenRouterKeyControl />
           {isEditingProfile ? (
             <form className="account-edit" onSubmit={(event) => { event.preventDefault(); if (profileDraft.trim()) profileMutation.mutate(profileDraft.trim()); }}>
               <label className="sr-only" htmlFor="account-name">Tên của bạn</label>
