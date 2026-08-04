@@ -1,98 +1,159 @@
-# AI Startup Coach
+# AI Startup Coaching Agent
 
-AI Startup Coach is a full-stack coaching workspace that helps founders move
-from an idea through structured startup stages, generated documents, reports,
-and pitch preparation. The backend combines deterministic domain tools with an
-OpenAI-compatible LLM provider; the frontend presents the coaching journey as a
-React application.
+AI Startup Coaching Agent is a full-stack AI product that guides early-stage founders through a structured startup-building journey. Instead of returning a single generic answer, the agent maintains each startup's context, progresses through business-planning stages, uses domain-specific tools to create structured documents, and preserves the evolution of the startup idea over time.
+
+## Why this project
+
+Turning an idea into a startup plan usually requires several disconnected frameworks and repeated manual work. This project combines those workflows into one conversational workspace where founders can move from an initial idea to a practical plan for validation, product development, marketing, and fundraising.
+
+## Key features
+
+- Conversational AI coach with context-aware chat history and startup-specific memory.
+- Guided workflow with seven stages: Idea, Lean Canvas, Business Model Canvas, SWOT, Product Plan, Marketing, and Funding.
+- Stage-aware tool calling: the model can only access tools that are relevant to the current stage, while validation prevents malformed or out-of-order actions.
+- Structured startup documents with version history, current-version tracking, document comparison, and editable workspace views.
+- Startup overview and consolidated report for reviewing progress and generated outputs.
+- Export reports to PDF/DOCX and export a funding pitch outline as a PDF pitch deck.
+- Authentication with password hashing, access tokens, refresh tokens, logout, and ownership checks for startup data.
+- AgentOps instrumentation for LLM/tool latency, token usage, estimated cost, errors, and threshold-based error alerts.
+- Automated CI/CD with backend and frontend tests, deterministic evaluations, secret scanning, CodeQL, Trivy, and Render deployment hooks.
 
 ## Architecture
 
-- `app/`: FastAPI API, async SQLAlchemy persistence, coaching orchestration,
-  startup-stage tools, document generation, and LLM integration.
-- `frontend/`: React 19, TypeScript, Vite, React Query, and Zustand application.
-- `tests/`: backend unit, service, API, persistence, and security tests.
-- `evals/`: database-free deterministic coaching evaluations.
-- `app/db/migrations/`: PostgreSQL schema migrations managed by Alembic.
-- `docs/`: product specifications, plans, deployment notes, and handoffs.
+```text
+React + Vite frontend
+        |
+        | REST API
+        v
+FastAPI backend
+  ├── Authentication and ownership layer
+  ├── Agent orchestrator
+  │     ├── Context builder
+  │     ├── Stage manager
+  │     ├── Skill loader
+  │     └── Tool dispatcher
+  ├── Document, report, and export services
+  └── AgentOps instrumentation
+        |
+        +── PostgreSQL + Alembic migrations
+        +── OpenAI-compatible LLM provider (OpenRouter/9Router)
+```
 
-Agent-specific project conventions live in `AGENTS.md` and the scoped guides in
-`app/AGENTS.md` and `frontend/AGENTS.md`.
+The core agent loop is:
 
-## Configuration
+```text
+User message
+  -> load startup context and recent history
+  -> load stage-specific skill and tools
+  -> call the LLM
+  -> validate and execute tool calls
+  -> persist documents and conversation events
+  -> return the final response and readiness information
+```
 
-Copy `.env.example` to `.env` and configure at least the database, authentication,
-and LLM provider values documented in that file. The primary LLM variables are:
+The agent does not silently advance a startup to the next stage. It checks readiness and asks for confirmation, while users can revisit earlier stages and retain document versions.
 
-- `LLM_BASE_URL`, such as `http://localhost:20128/v1` for local 9Router.
-- `LLM_API_KEY`, which may be empty only when the local provider does not enforce keys.
-- `LLM_MODEL`, such as `openai/gpt-4o-mini`.
+## Tech stack
 
-Legacy `LLM_PROXY_*` and `OPENROUTER_*` variables are temporary fallbacks; new
-configuration should use `LLM_*`.
+### Frontend
 
-## Backend development
+- React 19, TypeScript, Vite
+- TanStack Query for server state
+- Zustand for local UI/auth state
+- React Markdown with GitHub Flavored Markdown support
+- Vitest and Testing Library
 
-Python 3.11 or newer and PostgreSQL are required.
+### Backend
+
+- Python 3.11+, FastAPI, Uvicorn
+- SQLAlchemy async ORM with asyncpg
+- PostgreSQL and Alembic
+- Pydantic Settings for configuration
+- OpenAI-compatible chat completion client
+- Argon2 password hashing and JWT authentication
+- ReportLab and python-docx for document export
+- Pytest, HTTPX, and deterministic evaluation fixtures
+
+### Infrastructure and quality
+
+- Docker Compose for local frontend, backend, and PostgreSQL development
+- Render Blueprint for deployment
+- GitHub Actions for tests, build checks, security scans, and deployment gates
+
+## Project structure
+
+```text
+app/        FastAPI application, domain logic, services, models, migrations
+frontend/   React application and feature-oriented UI components
+skills/     Domain prompts for each startup coaching stage
+tests/      Backend unit/integration tests and tool validation tests
+evals/      Deterministic, DB-free agent behavior evaluations
+docs/       Product specifications, architecture decisions, and handoff notes
+```
+
+## Run locally with Docker Compose
+
+1. Copy the environment template:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+2. Configure the database and an OpenAI-compatible LLM endpoint in `.env`. For a local 9Router setup, use `http://localhost:20128/v1` as `LLM_BASE_URL`.
+
+3. Start the stack:
+
+   ```bash
+   docker compose -f compose.yaml up --build
+   ```
+
+4. Open the frontend at `http://localhost:5173`. The backend health endpoint is available at `http://localhost:8000/health`, and FastAPI documentation is available at `http://localhost:8000/docs`.
+
+## Run without Docker
+
+Backend:
 
 ```bash
 python -m venv .venv
-# Windows: .venv\Scripts\activate
-# macOS/Linux: source .venv/bin/activate
+# Activate the virtual environment using the command for your shell.
 python -m pip install -e ".[dev]"
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-Quality checks:
+Frontend:
 
 ```bash
-python -m ruff check app tests evals
+cd frontend
+npm ci
+npm run dev
+```
+
+## Test and build
+
+```bash
 python -m pytest
 python -m evals.run
+
+cd frontend
+npm run typecheck
+npm test
+npm run build
 ```
 
-Use `python -m ruff format app tests evals` when deliberately formatting the
-Python codebase; formatting is not yet a repository-wide legacy-code gate.
+## Engineering highlights
 
-Tests that exercise persistence use Testcontainers and therefore require a
-working Docker daemon.
+- Separates API, orchestration, domain, persistence, export, and observability responsibilities into testable services.
+- Uses explicit stage schemas and tool validation to make LLM-driven mutations safer and more predictable.
+- Keeps generated document history instead of overwriting previous work, making the startup journey auditable.
+- Treats observability as part of the agent design by recording turn, LLM, and tool-level metrics.
+- Includes automated security gates for secrets, static analysis, and dependency/configuration vulnerabilities.
 
-## Frontend development
+## Project status
 
-Node.js 22 is the CI-supported runtime.
+This is an actively developed portfolio project. The repository contains the working application architecture, local Docker workflow, test/evaluation suite, and deployment configuration. Provider credentials and deployment secrets are intentionally supplied through environment variables and are not committed to the repository.
 
-```bash
-npm --prefix frontend ci
-npm --prefix frontend run dev
-```
+## Author
 
-Quality checks:
-
-```bash
-npm --prefix frontend run lint
-npm --prefix frontend run typecheck
-npm --prefix frontend test
-npm --prefix frontend run build
-```
-
-Set `VITE_API_PROXY_TARGET` when the backend is not available at
-`http://localhost:8000`.
-
-## Pre-commit checks
-
-After installing backend development dependencies, enable the repository hooks:
-
-```bash
-pre-commit install
-pre-commit run --all-files
-```
-
-The hooks run Ruff on staged Python files and Biome lint on frontend JavaScript
-and TypeScript changes. CI repeats lint, tests, type checking, builds, deterministic
-evaluations, secret scanning, CodeQL, and Trivy checks.
-
-## Containers and deployment
-
-`docker compose up --build` starts the containerized stack. Production deployment
-is performed by the GitHub Actions workflows after their test and security gates
-pass; deployment details are in `docs/render-deployment.md`.
+Nguyen Duc Viet
+GitHub: [AI-Startup-Coach](https://github.com/nguyenducviet22/AI-Startup-Coach)
