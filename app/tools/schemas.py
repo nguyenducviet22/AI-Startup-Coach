@@ -1,6 +1,8 @@
+from datetime import date
 from typing import Annotated, Literal
 
 from app.domain.stages import StageName
+from app.research.schemas import ResearchCategory, SearchDepth
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 
@@ -85,3 +87,24 @@ class CheckStageReadinessArgs(ToolArguments):
     current_stage: StageName
     ready: bool
     missing_fields: list[NonEmptyString] = Field(default_factory=list)
+
+
+class ResearchWebArgs(ToolArguments):
+    """Founder-safe input for the provider-neutral research tool."""
+
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000)] | None = None
+    urls: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000)]] = Field(
+        default_factory=list,
+        max_length=5,
+    )
+    category: ResearchCategory = ResearchCategory.GENERAL
+    search_depth: SearchDepth = SearchDepth.BASIC
+    include_domains: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]] = Field(
+        default_factory=list,
+        max_length=20,
+    )
+    start_date: date | None = None
+    end_date: date | None = None
+    jurisdiction: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = None
+    force_refresh: bool = False
+    max_results: Annotated[int, Field(ge=1, le=20)] = 5

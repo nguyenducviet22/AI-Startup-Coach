@@ -11,6 +11,9 @@ from app.db.session import get_db_session
 from app.llm.openrouter import ChatCompletionClient, OpenRouterChatClient
 from app.models.startup import Startup
 from app.models.user import User
+from app.research.errors import ResearchProviderError
+from app.research.protocol import ResearchProvider
+from app.research.tavily import create_research_provider
 from app.services.local_profile_service import LocalProfileService
 
 
@@ -39,6 +42,32 @@ def get_chat_client(
         }
     )
     return OpenRouterChatClient(settings=request_settings)
+
+
+def get_research_provider(settings: Annotated[Settings, Depends(get_settings)]) -> ResearchProvider:
+    if not settings.research_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=ResearchProviderError("research_disabled").detail(),
+        )
+    if settings.research_provider != "tavily" or not settings.tavily_base_url.strip():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=ResearchProviderError("research_misconfigured").detail(),
+        )
+    if not settings.tavily_api_key.strip():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=ResearchProviderError("provider_missing_key").detail(),
+        )
+    return create_research_provider(settings)
+
+
+def get_chat_research_provider(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> ResearchProvider:
+    """Build the adapter for a chat turn without blocking non-research chat."""
+    return create_research_provider(settings)
 
 
 async def get_current_user(

@@ -8,6 +8,7 @@ from app.tools.schemas import (
     GenerateMarketingStrategyArgs,
     GenerateProductPlanArgs,
     GenerateSwotArgs,
+    ResearchWebArgs,
     ToolArguments,
 )
 
@@ -19,6 +20,7 @@ TOOL_MODELS: dict[str, type[ToolArguments]] = {
     "generate_marketing_strategy": GenerateMarketingStrategyArgs,
     "generate_funding_guide": GenerateFundingGuideArgs,
     "check_stage_readiness": CheckStageReadinessArgs,
+    "research_web": ResearchWebArgs,
 }
 
 TOOL_DESCRIPTIONS: dict[str, str] = {
@@ -29,6 +31,10 @@ TOOL_DESCRIPTIONS: dict[str, str] = {
     "generate_marketing_strategy": "Create or update the startup's marketing strategy.",
     "generate_funding_guide": "Create or update the funding preparation guide and pitch outline.",
     "check_stage_readiness": "Evaluate whether the current information is sufficient to advance to the next stage.",
+    "research_web": (
+        "Research a founder question or founder-supplied URLs. Returns normalized evidence records "
+        "with source URLs and retrieval dates. Legal or regulatory results always carry a mandatory disclaimer."
+    ),
 }
 
 

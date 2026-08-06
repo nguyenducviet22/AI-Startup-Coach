@@ -43,6 +43,7 @@ async def test_orchestrator_calls_llm_with_stage_filtered_tools() -> None:
 
     assert result == "Ask one sharper customer question."
     assert [tool["function"]["name"] for tool in client.requests[0]["tools"]] == [
+        "research_web",
         "check_stage_readiness"
     ]
     assert client.requests[0]["messages"][0]["role"] == "system"

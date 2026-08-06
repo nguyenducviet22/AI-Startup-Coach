@@ -66,7 +66,7 @@ async def client(
     _reset_app_db_session()
     app.dependency_overrides[get_db_session] = override_session
     app.dependency_overrides[get_chat_client] = lambda: fake_chat_client
-    app.dependency_overrides[get_settings] = _settings
+    app.dependency_overrides[get_settings] = lambda: _settings()
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as test_client:
@@ -871,6 +871,7 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     assert current_canvas["is_current"] is True
     assert current_canvas["content"]["problem"] == "Tutors lose hours coordinating lessons."
 
+
     client.fake_chat_client.responses = [
         _response(
             None,
@@ -958,6 +959,30 @@ async def test_end_to_end_idea_to_lean_canvas_to_bmc_requires_explicit_stage_adv
     )
 
 
+async def test_chat_route_succeeds_without_research_configuration_when_no_research_tool_is_called(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    from app.main import app
+
+    app.dependency_overrides[get_settings] = lambda: _settings(
+        TAVILY_API_KEY="",
+        RESEARCH_ENABLED=False,
+    )
+    user_id = await _create_user(session_factory)
+    startup_id = await _create_startup(session_factory, user_id)
+    client.fake_chat_client.responses = [_response("Normal coaching response.")]
+
+    response = await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "Help me sharpen my idea."},
+        headers=_auth_headers(user_id),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Normal coaching response."
+
+
 async def _create_user(session_factory: async_sessionmaker[AsyncSession]) -> uuid.UUID:
     async with session_factory() as session:
         user = User(name="Route Test User", email=f"{uuid.uuid4()}@example.com")
@@ -1028,22 +1053,25 @@ def _auth_headers(user_id: uuid.UUID) -> dict[str, str]:
     }
 
 
-def _settings() -> Settings:
-    return Settings(
-        DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/coaching",
-        OPENROUTER_API_KEY="test-key",
-        OPENROUTER_BASE_URL="https://openrouter.test/api/v1",
-        OPENROUTER_MODEL="test-model",
-        OPENROUTER_HTTP_REFERER="http://localhost:8000",
-        OPENROUTER_X_TITLE="AI Startup Coach",
-        CHAT_HISTORY_LIMIT=20,
-        LLM_MAX_RETRIES=2,
-        LLM_RETRY_BACKOFF_SECONDS=0,
-        JWT_SECRET="route-test-secret-with-at-least-thirty-two-bytes",
-        JWT_ALGORITHM="HS256",
-        ACCESS_TOKEN_EXPIRE_MINUTES=30,
-        REFRESH_TOKEN_EXPIRE_DAYS=7,
-    )
+def _settings(**overrides: object) -> Settings:
+    values = {
+        "DATABASE_URL": "postgresql+asyncpg://postgres:postgres@localhost:5432/coaching",
+        "OPENROUTER_API_KEY": "test-key",
+        "OPENROUTER_BASE_URL": "https://openrouter.test/api/v1",
+        "OPENROUTER_MODEL": "test-model",
+        "OPENROUTER_HTTP_REFERER": "http://localhost:8000",
+        "OPENROUTER_X_TITLE": "AI Startup Coach",
+        "CHAT_HISTORY_LIMIT": 20,
+        "LLM_MAX_RETRIES": 2,
+        "LLM_RETRY_BACKOFF_SECONDS": 0,
+        "TAVILY_API_KEY": "test-research-key",
+        "JWT_SECRET": "route-test-secret-with-at-least-thirty-two-bytes",
+        "JWT_ALGORITHM": "HS256",
+        "ACCESS_TOKEN_EXPIRE_MINUTES": 30,
+        "REFRESH_TOKEN_EXPIRE_DAYS": 7,
+    }
+    values.update(overrides)
+    return Settings(**values)
 
 
 def _asyncpg_url(url: str) -> str:

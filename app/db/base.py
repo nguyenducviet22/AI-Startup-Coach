@@ -9,6 +9,7 @@ from app.models.documents import (
     ProductPlan,
     Swot,
 )
+from app.models.research import ResearchCacheEntry, ResearchCall, ResearchQuotaReservation
 from app.models.startup import Startup
 from app.models.user import User
 
@@ -25,6 +26,9 @@ __all__ = [
     "MarketingStrategy",
     "ProductPlan",
     "RefreshToken",
+    "ResearchCacheEntry",
+    "ResearchCall",
+    "ResearchQuotaReservation",
     "Startup",
     "Swot",
     "ToolCallLog",

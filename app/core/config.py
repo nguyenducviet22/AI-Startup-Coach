@@ -67,6 +67,65 @@ class Settings(BaseSettings):
     llm_retry_backoff_seconds: float = Field(default=1.0, alias="LLM_RETRY_BACKOFF_SECONDS")
     agentops_pricing_enabled: bool = Field(default=True, alias="AGENTOPS_PRICING_ENABLED")
 
+    research_enabled: bool = Field(default=True, alias="RESEARCH_ENABLED")
+    research_provider: str = Field(default="tavily", alias="RESEARCH_PROVIDER")
+    tavily_api_key: str = Field(default="", alias="TAVILY_API_KEY")
+    tavily_base_url: str = Field(default="https://api.tavily.com", alias="TAVILY_BASE_URL")
+    research_provider_timeout_seconds: float = Field(
+        default=15.0,
+        alias="RESEARCH_PROVIDER_TIMEOUT_SECONDS",
+    )
+    research_provider_max_retries: int = Field(default=1, alias="RESEARCH_PROVIDER_MAX_RETRIES")
+    research_session_hourly_call_limit: int = Field(
+        default=8,
+        alias="RESEARCH_SESSION_HOURLY_CALL_LIMIT",
+    )
+    research_session_daily_credit_limit: int = Field(
+        default=20,
+        alias="RESEARCH_SESSION_DAILY_CREDIT_LIMIT",
+    )
+    research_user_hourly_call_limit: int = Field(
+        default=20,
+        alias="RESEARCH_USER_HOURLY_CALL_LIMIT",
+    )
+    research_user_daily_credit_limit: int = Field(
+        default=60,
+        alias="RESEARCH_USER_DAILY_CREDIT_LIMIT",
+    )
+    research_cache_ttl_general_seconds: int = Field(
+        default=21600,
+        alias="RESEARCH_CACHE_TTL_GENERAL_SECONDS",
+    )
+    research_cache_ttl_news_seconds: int = Field(
+        default=3600,
+        alias="RESEARCH_CACHE_TTL_NEWS_SECONDS",
+    )
+    research_cache_ttl_pricing_seconds: int = Field(
+        default=3600,
+        alias="RESEARCH_CACHE_TTL_PRICING_SECONDS",
+    )
+    research_cache_ttl_legal_seconds: int = Field(
+        default=3600,
+        alias="RESEARCH_CACHE_TTL_LEGAL_SECONDS",
+    )
+    research_default_search_depth: str = Field(default="basic", alias="RESEARCH_DEFAULT_SEARCH_DEPTH")
+    research_max_results: int = Field(default=5, alias="RESEARCH_MAX_RESULTS")
+    research_pricing_enabled: bool = Field(default=True, alias="RESEARCH_PRICING_ENABLED")
+    tavily_basic_search_credits: int = Field(default=1, alias="TAVILY_BASIC_SEARCH_CREDITS")
+    tavily_advanced_search_credits: int = Field(default=2, alias="TAVILY_ADVANCED_SEARCH_CREDITS")
+    tavily_extract_credits_per_five_urls: int = Field(
+        default=1,
+        alias="TAVILY_EXTRACT_CREDITS_PER_FIVE_URLS",
+    )
+    research_error_alert_threshold: float = Field(
+        default=0.5,
+        alias="RESEARCH_ERROR_ALERT_THRESHOLD",
+    )
+    research_error_alert_window_seconds: int = Field(
+        default=300,
+        alias="RESEARCH_ERROR_ALERT_WINDOW_SECONDS",
+    )
+
     jwt_secret: str = Field(alias="JWT_SECRET")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
@@ -110,6 +169,39 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "LLM_MODEL must be explicitly configured when APP_ENV is not local."
                 )
+
+        self.research_provider = self.research_provider.strip().lower()
+        if self.research_provider != "tavily":
+            raise ValueError("RESEARCH_PROVIDER must be 'tavily'.")
+        self.tavily_base_url = self.tavily_base_url.strip().rstrip("/")
+        if not self.tavily_base_url:
+            raise ValueError("TAVILY_BASE_URL must not be empty.")
+        if self.research_default_search_depth not in {"basic", "advanced"}:
+            raise ValueError("RESEARCH_DEFAULT_SEARCH_DEPTH must be 'basic' or 'advanced'.")
+        if self.research_provider_timeout_seconds <= 0:
+            raise ValueError("RESEARCH_PROVIDER_TIMEOUT_SECONDS must be greater than 0.")
+        if self.research_provider_max_retries < 0:
+            raise ValueError("RESEARCH_PROVIDER_MAX_RETRIES must be greater than or equal to 0.")
+        for field_name in (
+            "research_session_hourly_call_limit",
+            "research_session_daily_credit_limit",
+            "research_user_hourly_call_limit",
+            "research_user_daily_credit_limit",
+            "research_cache_ttl_general_seconds",
+            "research_cache_ttl_news_seconds",
+            "research_cache_ttl_pricing_seconds",
+            "research_cache_ttl_legal_seconds",
+            "research_max_results",
+            "tavily_basic_search_credits",
+            "tavily_advanced_search_credits",
+            "tavily_extract_credits_per_five_urls",
+            "research_error_alert_window_seconds",
+        ):
+            if getattr(self, field_name) <= 0:
+                alias = type(self).model_fields[field_name].alias
+                raise ValueError(f"{alias} must be greater than 0.")
+        if not 0 <= self.research_error_alert_threshold <= 1:
+            raise ValueError("RESEARCH_ERROR_ALERT_THRESHOLD must be between 0 and 1.")
         return self
 
 

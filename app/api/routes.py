@@ -5,7 +5,12 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_chat_client, get_local_user, require_startup_owner
+from app.api.dependencies import (
+    get_chat_client,
+    get_chat_research_provider,
+    get_local_user,
+    require_startup_owner,
+)
 from app.api.schemas import (
     AuthLoginRequest,
     AuthLogoutRequest,
@@ -46,8 +51,13 @@ from app.services.document_export_service import DocumentExportService
 from app.services.local_profile_service import LocalProfileService
 from app.services.agentops.instrumented_chat_client import InstrumentedChatClient
 from app.services.agentops.instrumented_orchestrator import InstrumentedAgentOrchestrator
+from app.services.agentops.instrumented_research_service import InstrumentedResearchService
 from app.services.agentops.instrumented_tool_dispatcher import InstrumentedToolDispatcher
 from app.services.orchestrator import AgentOrchestrator
+from app.services.research_prompt import ResearchSkillLoader
+from app.services.research_service import ResearchService
+from app.services.skill_loader import SkillLoader
+from app.services.tool_dispatcher import ResearchExecutionContext
 from app.services.stage_service import AlreadyCompletedError, StageService
 from app.services.startup_service import (
     StartupNotFoundError,
@@ -58,6 +68,7 @@ from app.services.startup_service import (
 from app.services.startup_overview_service import StartupOverviewService
 from app.services.startup_report_service import ReportSectionSelectionError, StartupReportService
 from app.services.tool_dispatcher import ToolDispatcher
+from app.research.protocol import ResearchProvider
 
 router = APIRouter()
 
@@ -246,6 +257,7 @@ async def chat(
     request: ChatRequest,
     session: Annotated[AsyncSession, Depends(get_db_session)],
     chat_client: Annotated[ChatCompletionClient, Depends(get_chat_client)],
+    research_provider: Annotated[ResearchProvider, Depends(get_chat_research_provider)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> dict[str, Any]:
     chat_service = ChatService(session)
@@ -274,8 +286,27 @@ async def chat(
             stage=startup.current_stage,
             settings=settings,
         )
+        research_context = ResearchExecutionContext(
+            startup_id=startup.id,
+            user_id=startup.user_id,
+            session_id=chat_session.id,
+            turn_id=turn_id,
+            stage=startup.current_stage,
+        )
+        instrumented_research_service = InstrumentedResearchService(
+            wrapped=ResearchService(session, research_provider, settings),
+            turn_id=turn_id,
+            startup_id=startup.id,
+            user_id=startup.user_id,
+            session_id=chat_session.id,
+            stage=startup.current_stage,
+        )
         tool_dispatcher = InstrumentedToolDispatcher(
-            wrapped=ToolDispatcher(document_service=document_service),
+            wrapped=ToolDispatcher(
+                document_service=document_service,
+                research_service=instrumented_research_service,
+                research_context=research_context,
+            ),
             turn_id=turn_id,
             startup_id=startup.id,
             stage=startup.current_stage,
@@ -284,6 +315,7 @@ async def chat(
         orchestrator = AgentOrchestrator(
             chat_client=instrumented_chat_client,
             tool_dispatcher=tool_dispatcher,
+            skill_loader=ResearchSkillLoader(SkillLoader()),
             settings=settings,
         )
         instrumented_orchestrator = InstrumentedAgentOrchestrator(

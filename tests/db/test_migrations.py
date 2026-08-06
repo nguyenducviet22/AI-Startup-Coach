@@ -9,7 +9,7 @@ from testcontainers.community.postgres import PostgresContainer
 from app.core.config import ROOT_DIR, get_settings
 
 
-def test_alembic_upgrade_head_creates_auth_and_agentops_tables(monkeypatch) -> None:
+def test_alembic_upgrade_head_creates_auth_agentops_and_research_tables(monkeypatch) -> None:
     with PostgresContainer("postgres:16-alpine") as postgres:
         async_url = _asyncpg_url(postgres.get_connection_url())
         monkeypatch.setenv("DATABASE_URL", async_url)
@@ -20,7 +20,15 @@ def test_alembic_upgrade_head_creates_auth_and_agentops_tables(monkeypatch) -> N
         command.upgrade(alembic_config, "head")
 
         try:
-            table_names, columns_by_table, nullable_by_table, indexes_by_table = asyncio.run(_inspect_schema(async_url))
+            (
+                table_names,
+                columns_by_table,
+                nullable_by_table,
+                indexes_by_table,
+                foreign_keys_by_table,
+                unique_constraints_by_table,
+                identity_columns_by_table,
+            ) = asyncio.run(_inspect_schema(async_url))
         finally:
             get_settings.cache_clear()
 
@@ -30,6 +38,9 @@ def test_alembic_upgrade_head_creates_auth_and_agentops_tables(monkeypatch) -> N
         assert "llm_calls" in table_names
         assert "tool_calls_log" in table_names
         assert "alert_events" in table_names
+        assert "research_calls" in table_names
+        assert "research_cache_entries" in table_names
+        assert "research_quota_reservations" in table_names
         assert columns_by_table["auth_credentials"] == {
             "id",
             "user_id",
@@ -107,6 +118,58 @@ def test_alembic_upgrade_head_creates_auth_and_agentops_tables(monkeypatch) -> N
             "triggered_at",
             "resolved_at",
         }
+        assert columns_by_table["research_calls"] == {
+            "id",
+            "sequence",
+            "turn_id",
+            "startup_id",
+            "user_id",
+            "session_id",
+            "stage",
+            "provider",
+            "operation",
+            "category",
+            "query_fingerprint",
+            "provider_request_id",
+            "cache_hit",
+            "provider_call_made",
+            "credits_reserved",
+            "credits_charged",
+            "cost_usd",
+            "pricing_unknown",
+            "latency_ms",
+            "status",
+            "error_code",
+            "created_at",
+        }
+        assert columns_by_table["research_cache_entries"] == {
+            "id",
+            "sequence",
+            "startup_id",
+            "research_call_id",
+            "cache_key",
+            "operation",
+            "category",
+            "payload",
+            "retrieved_at",
+            "expires_at",
+            "created_at",
+            "updated_at",
+        }
+        assert columns_by_table["research_quota_reservations"] == {
+            "id",
+            "sequence",
+            "user_id",
+            "session_id",
+            "reserved_calls",
+            "reserved_credits",
+            "charged_credits",
+            "released_credits",
+            "status",
+            "created_at",
+            "reconciled_at",
+            "released_at",
+        }
         assert indexes_by_table["llm_calls"] >= {
             ("ix_llm_calls_created_at", ("created_at",)),
             ("ix_llm_calls_stage_created_at", ("stage", "created_at")),
@@ -115,13 +178,65 @@ def test_alembic_upgrade_head_creates_auth_and_agentops_tables(monkeypatch) -> N
             ("ix_tool_calls_log_created_at", ("created_at",)),
             ("ix_tool_calls_log_stage_created_at", ("stage", "created_at")),
         }
+        assert indexes_by_table["research_calls"] >= {
+            ("ix_research_calls_startup_created_at", ("startup_id", "created_at")),
+            ("ix_research_calls_user_created_at", ("user_id", "created_at")),
+            ("ix_research_calls_session_created_at", ("session_id", "created_at")),
+            ("ix_research_calls_stage_category_created_at", ("stage", "category", "created_at")),
+            ("ix_research_calls_turn_id", ("turn_id",)),
+        }
+        assert indexes_by_table["research_cache_entries"] >= {
+            ("ix_research_cache_entries_expires_at", ("expires_at",)),
+        }
+        assert indexes_by_table["research_quota_reservations"] >= {
+            ("ix_research_quota_reservations_user_created_at", ("user_id", "created_at")),
+            ("ix_research_quota_reservations_session_created_at", ("session_id", "created_at")),
+        }
         assert nullable_by_table["llm_calls"]["turn_id"] is False
         assert nullable_by_table["tool_calls_log"]["turn_id"] is False
+        assert nullable_by_table["research_calls"]["turn_id"] is True
+        assert nullable_by_table["research_cache_entries"]["research_call_id"] is True
+        assert foreign_keys_by_table["research_cache_entries"] >= {
+            ("fk_research_cache_entries_startup_id_startups", ("startup_id",), "startups"),
+            (
+                "fk_research_cache_entries_research_call_id_research_calls",
+                ("research_call_id",),
+                "research_calls",
+            ),
+        }
+        assert foreign_keys_by_table["research_calls"] >= {
+            ("fk_research_calls_turn_id_agent_turns", ("turn_id",), "agent_turns"),
+            ("fk_research_calls_startup_id_startups", ("startup_id",), "startups"),
+            ("fk_research_calls_user_id_users", ("user_id",), "users"),
+            ("fk_research_calls_session_id_chat_sessions", ("session_id",), "chat_sessions"),
+        }
+        assert foreign_keys_by_table["research_quota_reservations"] >= {
+            ("fk_research_quota_reservations_user_id_users", ("user_id",), "users"),
+            ("fk_research_quota_reservations_session_id_chat_sessions", ("session_id",), "chat_sessions"),
+        }
+        assert (
+            "uq_research_cache_entries_startup_id_cache_key",
+            ("startup_id", "cache_key"),
+        ) in unique_constraints_by_table["research_cache_entries"]
+        for table_name in (
+            "research_calls",
+            "research_cache_entries",
+            "research_quota_reservations",
+        ):
+            assert "sequence" in identity_columns_by_table[table_name]
 
 
 async def _inspect_schema(
     url: str,
-) -> tuple[list[str], dict[str, set[str]], dict[str, dict[str, bool]], dict[str, set[tuple[str, tuple[str, ...]]]]]:
+) -> tuple[
+    list[str],
+    dict[str, set[str]],
+    dict[str, dict[str, bool]],
+    dict[str, set[tuple[str, tuple[str, ...]]]],
+    dict[str, set[tuple[str | None, tuple[str, ...], str]]],
+    dict[str, set[tuple[str | None, tuple[str, ...]]]],
+    dict[str, set[str]],
+]:
     engine = create_async_engine(url)
     try:
         async with engine.connect() as connection:
@@ -132,35 +247,87 @@ async def _inspect_schema(
 
 def _inspect_schema_sync(
     connection,
-) -> tuple[list[str], dict[str, set[str]], dict[str, dict[str, bool]], dict[str, set[tuple[str, tuple[str, ...]]]]]:
+) -> tuple[
+    list[str],
+    dict[str, set[str]],
+    dict[str, dict[str, bool]],
+    dict[str, set[tuple[str, tuple[str, ...]]]],
+    dict[str, set[tuple[str | None, tuple[str, ...], str]]],
+    dict[str, set[tuple[str | None, tuple[str, ...]]]],
+    dict[str, set[str]],
+]:
     inspector = inspect(connection)
     table_names = inspector.get_table_names()
+    inspected_tables = (
+        "auth_credentials",
+        "refresh_tokens",
+        "agent_turns",
+        "llm_calls",
+        "tool_calls_log",
+        "alert_events",
+        "research_calls",
+        "research_cache_entries",
+        "research_quota_reservations",
+    )
     columns_by_table = {
         table_name: {column["name"] for column in inspector.get_columns(table_name)}
-        for table_name in (
-            "auth_credentials",
-            "refresh_tokens",
-            "agent_turns",
-            "llm_calls",
-            "tool_calls_log",
-            "alert_events",
-        )
+        for table_name in inspected_tables
     }
     nullable_by_table = {
         table_name: {
             column["name"]: column["nullable"]
             for column in inspector.get_columns(table_name)
         }
-        for table_name in ("llm_calls", "tool_calls_log")
+        for table_name in ("llm_calls", "tool_calls_log", "research_calls", "research_cache_entries")
     }
     indexes_by_table = {
         table_name: {
             (index["name"], tuple(index["column_names"]))
             for index in inspector.get_indexes(table_name)
         }
-        for table_name in ("llm_calls", "tool_calls_log")
+        for table_name in (
+            "llm_calls",
+            "tool_calls_log",
+            "research_calls",
+            "research_cache_entries",
+            "research_quota_reservations",
+        )
     }
-    return table_names, columns_by_table, nullable_by_table, indexes_by_table
+    foreign_keys_by_table = {
+        table_name: {
+            (
+                foreign_key["name"],
+                tuple(foreign_key["constrained_columns"]),
+                foreign_key["referred_table"],
+            )
+            for foreign_key in inspector.get_foreign_keys(table_name)
+        }
+        for table_name in ("research_calls", "research_cache_entries", "research_quota_reservations")
+    }
+    unique_constraints_by_table = {
+        table_name: {
+            (constraint["name"], tuple(constraint["column_names"]))
+            for constraint in inspector.get_unique_constraints(table_name)
+        }
+        for table_name in ("research_cache_entries",)
+    }
+    identity_columns_by_table = {
+        table_name: {
+            column["name"]
+            for column in inspector.get_columns(table_name)
+            if column.get("identity") is not None
+        }
+        for table_name in ("research_calls", "research_cache_entries", "research_quota_reservations")
+    }
+    return (
+        table_names,
+        columns_by_table,
+        nullable_by_table,
+        indexes_by_table,
+        foreign_keys_by_table,
+        unique_constraints_by_table,
+        identity_columns_by_table,
+    )
 
 
 def _asyncpg_url(url: str) -> str:
