@@ -60,8 +60,8 @@ describe("ChatPanel", () => {
       <ChatPanel startupId="startup-1" currentStage="idea" onAdvanceStage={vi.fn()} />
     );
 
-    expect(await screen.findByLabelText("Tin nhắn")).toHaveValue("Saved draft");
-    await user.click(screen.getByRole("button", { name: "Gửi tin nhắn" }));
+    expect(await screen.findByLabelText("Message")).toHaveValue("Saved draft");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
     await waitFor(() => expect(useWorkspacePreferencesStore.getState().getWorkspace("startup-1").chatDraft).toBe(""));
   });
 
@@ -84,13 +84,13 @@ describe("ChatPanel", () => {
       <ChatPanel startupId="startup-1" currentStage="idea" onAdvanceStage={vi.fn()} />
     );
 
-    const composer = await screen.findByLabelText("Tin nhắn");
+    const composer = await screen.findByLabelText("Message");
     await user.type(composer, "Kiểm chứng ý tưởng");
-    await user.click(screen.getByRole("button", { name: "Gửi tin nhắn" }));
+    await user.click(screen.getByRole("button", { name: "Send message" }));
 
     expect(await screen.findByRole("button", { name: "Thinking..." })).toBeDisabled();
     await act(async () => resolveSend(jsonResponse({ session_id: "session-1", message: "Phản hồi", stage_readiness: null })));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Gửi tin nhắn" })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled());
   });
 
   it("hydrates history from the chat messages endpoint", async () => {
@@ -128,9 +128,9 @@ describe("ChatPanel", () => {
       <ChatPanel startupId="startup-1" currentStage="completed" onAdvanceStage={vi.fn()} />
     );
 
-    expect(await screen.findByText("Hành trình coaching đã hoàn thành")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Gửi tin nhắn" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Tin nhắn")).not.toBeInTheDocument();
+    expect(await screen.findByText("Coaching journey completed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send message" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Message")).not.toBeInTheDocument();
   });
 
   it("does not duplicate first-send temporary messages when the new session history refetches", async () => {
@@ -163,9 +163,9 @@ describe("ChatPanel", () => {
       <ChatPanel startupId="startup-1" currentStage="idea" onAdvanceStage={vi.fn()} />
     );
 
-    await screen.findByText("Bắt đầu cuộc trò chuyện");
-    await user.type(screen.getByLabelText("Tin nhắn"), "I want to build this.");
-    await user.click(screen.getByRole("button", { name: "Gửi tin nhắn" }));
+    await screen.findByText("Start the conversation");
+    await user.type(screen.getByLabelText("Message"), "I want to build this.");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
 
@@ -214,8 +214,8 @@ describe("ChatPanel", () => {
     );
 
     expect(await screen.findAllByText("Repeat this")).toHaveLength(1);
-    await user.type(screen.getByLabelText("Tin nhắn"), "Repeat this");
-    await user.click(screen.getByRole("button", { name: "Gửi tin nhắn" }));
+    await user.type(screen.getByLabelText("Message"), "Repeat this");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
 
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(3));
 

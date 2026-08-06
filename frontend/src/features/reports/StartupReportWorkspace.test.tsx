@@ -27,7 +27,7 @@ describe("StartupReportWorkspace", () => {
 
     expect(await screen.findByRole("checkbox", { name: "Tổng quan ý tưởng" })).toBeChecked();
     expect(screen.getByRole("checkbox", { name: "Phân tích SWOT" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "Tải hồ sơ PDF" }));
+    await user.click(screen.getByRole("button", { name: "Download PDF report" }));
     expect(fetch).toHaveBeenLastCalledWith("/startups/startup-1/report/export?format=pdf&sections=overview", expect.any(Object));
   });
 });

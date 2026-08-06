@@ -6,7 +6,7 @@ export function AuthCheckingScreen() {
         <strong>AI Startup Coach</strong>
       </div>
       <div className="auth-check-loader" aria-hidden="true" />
-      <p>Đang kiểm tra phiên đăng nhập...</p>
+      <p>Checking your session...</p>
     </main>
   );
 }

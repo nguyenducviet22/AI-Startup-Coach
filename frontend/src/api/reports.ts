@@ -13,7 +13,7 @@ export async function downloadStartupReport(startupId: string, format: DocumentE
   const response = await fetch(apiUrl(`/startups/${startupId}/report/export?${params.toString()}`), {
     headers: { Accept: format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
   });
-  if (!response.ok) throw new Error(`Không thể tải hồ sơ (${response.status}).`);
+  if (!response.ok) throw new Error(`Unable to download report (${response.status}).`);
   const blobUrl = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = blobUrl;
@@ -26,7 +26,7 @@ export async function downloadStartupReport(startupId: string, format: DocumentE
 
 export async function downloadPitchDeck(startupId: string): Promise<void> {
   const response = await fetch(apiUrl(`/startups/${startupId}/pitch-deck/export?format=pdf`), { headers: { Accept: "application/pdf" } });
-  if (!response.ok) throw new Error(`Không thể tải Pitch Deck (${response.status}).`);
+  if (!response.ok) throw new Error(`Unable to download pitch deck (${response.status}).`);
   const blobUrl = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");
   link.href = blobUrl;

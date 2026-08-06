@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+
 import type { StageReadiness } from "../../api/chat";
 import type { StageName } from "../../api/startups";
 import { nextStageLabel } from "../stages/stageLabels";
@@ -15,6 +17,12 @@ export function StageReadinessPrompt({
   isAdvancing = false,
   onAdvanceStage
 }: StageReadinessPromptProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  useEffect(() => {
+    setIsCollapsed(false);
+  }, [readiness, currentStage]);
+
   if (!readiness || currentStage === "completed") {
     return null;
   }
@@ -22,44 +30,66 @@ export function StageReadinessPrompt({
   const nextLabel = nextStageLabel(currentStage);
   if (readiness.ready && nextLabel) {
     return (
-      <section className="readiness-prompt readiness-ready" aria-label="Mức độ sẵn sàng của giai đoạn">
+      <section className="readiness-prompt readiness-ready" aria-label="Stage readiness">
         <div>
-          <h3>Sẵn sàng cho giai đoạn tiếp theo</h3>
-          <p>Coach nhận thấy bạn đã cung cấp đủ thông tin để tiếp tục.</p>
+          <h3>Ready for the next stage</h3>
+          <p>Your Coach has enough information to continue.</p>
         </div>
         <button type="button" className="primary-button" onClick={onAdvanceStage} disabled={isAdvancing}>
-          {isAdvancing ? "Đang chuyển..." : `Tiếp tục đến ${nextLabel}`}
+          {isAdvancing ? "Advancing..." : `Continue to ${nextLabel}`}
         </button>
       </section>
     );
   }
 
   return (
-    <section className="readiness-prompt" aria-label="Mức độ sẵn sàng của giai đoạn">
-      <h3>Cần thêm thông tin</h3>
-      {readiness.missing_fields.length > 0 ? (
-        <ul>
-          {readiness.missing_fields.map((field) => (
-            <li key={field}>{readinessFieldLabel(field)}</li>
-          ))}
-        </ul>
-      ) : (
-        <p>Coach cần thêm một vài chi tiết trước khi đề xuất chuyển giai đoạn.</p>
-      )}
+    <section className="readiness-prompt" aria-label="Stage readiness">
+      <div className="readiness-prompt-content">
+        <h3>More information needed</h3>
+        {!isCollapsed && readiness.missing_fields.length > 0 ? (
+          <ul>
+            {readiness.missing_fields.map((field) => (
+              <li key={field}>{readinessFieldLabel(field)}</li>
+            ))}
+          </ul>
+        ) : !isCollapsed ? (
+          <p>Your Coach needs a few more details before suggesting the next stage.</p>
+        ) : null}
+      </div>
+      <CollapseButton isCollapsed={isCollapsed} onToggle={() => setIsCollapsed((collapsed) => !collapsed)} />
     </section>
   );
 }
 
+type CollapseButtonProps = {
+  isCollapsed: boolean;
+  onToggle: () => void;
+};
+
+function CollapseButton({ isCollapsed, onToggle }: CollapseButtonProps) {
+  return (
+    <button
+      type="button"
+      className="readiness-collapse"
+      aria-label={isCollapsed ? "Expand readiness notice" : "Collapse readiness notice"}
+      aria-expanded={!isCollapsed}
+      onClick={onToggle}
+    >
+      {isCollapsed ? "+" : "−"}
+    </button>
+  );
+}
+
 const READINESS_FIELD_LABELS: Record<string, string> = {
-  problem: "Vấn đề khách hàng",
-  customer_segments: "Phân khúc khách hàng",
-  unique_value_proposition: "Giá trị khác biệt",
-  solution: "Giải pháp",
-  channels: "Kênh tiếp cận",
-  revenue_streams: "Dòng doanh thu",
-  cost_structure: "Cơ cấu chi phí",
-  key_metrics: "Chỉ số chính",
-  unfair_advantage: "Lợi thế khó sao chép"
+  problem: "Customer problem",
+  customer_segments: "Customer segments",
+  unique_value_proposition: "Unique value proposition",
+  solution: "Solution",
+  channels: "Channels",
+  revenue_streams: "Revenue streams",
+  cost_structure: "Cost structure",
+  key_metrics: "Key metrics",
+  unfair_advantage: "Unfair advantage"
 };
 
 function readinessFieldLabel(field: string): string {

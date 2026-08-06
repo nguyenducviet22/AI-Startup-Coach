@@ -21,11 +21,11 @@ describe("DocumentLayouts", () => {
       />
     );
 
-    const canvas = screen.getByLabelText("Các khối Lean Canvas");
+    const canvas = screen.getByLabelText("Lean Canvas blocks");
     expect(within(canvas).getAllByRole("heading", { level: 4 })).toHaveLength(9);
-    expect(screen.getByRole("heading", { name: "Vấn đề" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Problem" })).toBeInTheDocument();
     expect(screen.getByText("Tutors lose time coordinating lessons.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Dòng doanh thu" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Revenue streams" })).toBeInTheDocument();
     expect(screen.getByText("Monthly subscription")).toBeInTheDocument();
   });
 
@@ -41,11 +41,11 @@ describe("DocumentLayouts", () => {
       />
     );
 
-    const swot = screen.getByLabelText("Các nhóm SWOT");
+    const swot = screen.getByLabelText("SWOT groups");
     expect(within(swot).getAllByRole("heading", { level: 4 })).toHaveLength(4);
-    expect(screen.getByRole("heading", { name: "Điểm mạnh" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Strengths" })).toBeInTheDocument();
     expect(screen.getByText("Teacher relationships")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Thách thức" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Threats" })).toBeInTheDocument();
     expect(screen.getByText("Existing LMS tools")).toBeInTheDocument();
   });
 });

@@ -45,8 +45,8 @@ describe("DocumentWorkspace", () => {
       <DocumentWorkspace startupId="startup-1" selectedDocType="lean_canvas" onSelectDocType={vi.fn()} />
     );
 
-    expect(await screen.findByRole("heading", { name: "Chưa có Lean Canvas" })).toBeInTheDocument();
-    expect(screen.getByText("Chưa có phiên bản trước.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No Lean Canvas yet" })).toBeInTheDocument();
+    expect(screen.getByText("No previous versions.")).toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       "/startups/startup-1/documents/lean_canvas",
       expect.any(Object)
@@ -83,8 +83,8 @@ describe("DocumentWorkspace", () => {
       <DocumentWorkspace startupId="startup-1" startupName="EcoLearn" selectedDocType="swot" onSelectDocType={vi.fn()} />
     );
 
-    const pdfButton = await screen.findByRole("button", { name: "Tải PDF" });
-    expect(screen.getByRole("button", { name: "Tải DOCX" })).toBeInTheDocument();
+    const pdfButton = await screen.findByRole("button", { name: "Download PDF" });
+    expect(screen.getByRole("button", { name: "Download DOCX" })).toBeInTheDocument();
     await userEvent.click(pdfButton);
     expect(fetch).toHaveBeenLastCalledWith(
       "/startups/startup-1/documents/swot/export?format=pdf",
@@ -105,7 +105,7 @@ describe("DocumentWorkspace", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     const { rerender } = render(<QueryClientProvider client={queryClient}><DocumentWorkspace startupId="startup-1" selectedDocType="lean_canvas" onSelectDocType={vi.fn()} /></QueryClientProvider>);
 
-    await user.click(await screen.findByRole("button", { name: "Xem phiên bản 1" }));
+    await user.click(await screen.findByRole("button", { name: "Preview version 1" }));
     expect(screen.getByText("Old problem")).toBeInTheDocument();
     rerender(<QueryClientProvider client={queryClient}><DocumentWorkspace startupId="startup-1" selectedDocType="swot" onSelectDocType={vi.fn()} /></QueryClientProvider>);
 

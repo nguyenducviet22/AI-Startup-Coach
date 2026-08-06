@@ -17,7 +17,7 @@ describe("StartupList", () => {
     render(<StartupList startups={STARTUPS} selectedStartupId="1" isLoading={false} error={null} onSelect={vi.fn()} />);
 
     expect(screen.getByText("4/4 startup")).toBeInTheDocument();
-    await userEvent.type(screen.getByRole("searchbox", { name: "Tìm startup" }), "doi moi");
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search startups" }), "doi moi");
 
     expect(screen.getByText("Đổi mới xanh")).toBeInTheDocument();
     expect(screen.queryByText("EcoLearn")).not.toBeInTheDocument();
@@ -27,12 +27,12 @@ describe("StartupList", () => {
   it("filters active and completed startups with a contextual empty state", async () => {
     render(<StartupList startups={STARTUPS} selectedStartupId="1" isLoading={false} error={null} onSelect={vi.fn()} />);
 
-    await userEvent.click(screen.getByRole("button", { name: "Hoàn thành" }));
+    await userEvent.click(screen.getByRole("button", { name: "Completed" }));
     expect(screen.getByText("Pitch Ready")).toBeInTheDocument();
     expect(screen.getByText("1/4 startup")).toBeInTheDocument();
 
-    await userEvent.type(screen.getByRole("searchbox", { name: "Tìm startup" }), "không tồn tại");
-    expect(screen.getByText("Không tìm thấy startup phù hợp")).toBeInTheDocument();
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search startups" }), "không tồn tại");
+    expect(screen.getByText("No matching startups")).toBeInTheDocument();
   });
 });
 
@@ -51,13 +51,13 @@ describe("StartupNameControl", () => {
     const onRename = vi.fn();
     render(<StartupNameControl name="Paperpeer" isRenaming={false} onRename={onRename} />);
 
-    expect(screen.queryByRole("button", { name: "Đổi tên" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Rename" })).not.toBeInTheDocument();
     fireEvent.contextMenu(screen.getByRole("heading", { name: "Paperpeer" }), { clientX: 80, clientY: 90 });
-    await userEvent.click(screen.getByRole("menuitem", { name: "Đổi tên startup" }));
-    const input = screen.getByRole("textbox", { name: "Tên startup" });
+    await userEvent.click(screen.getByRole("menuitem", { name: "Rename startup" }));
+    const input = screen.getByRole("textbox", { name: "Startup name" });
     await userEvent.clear(input);
     await userEvent.type(input, "Paperpeer mới");
-    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(onRename).toHaveBeenCalledWith("Paperpeer mới");
   });

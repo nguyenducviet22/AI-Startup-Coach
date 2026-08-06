@@ -19,7 +19,7 @@ type DocumentWorkspaceProps = {
   onOpenReport?: () => void;
 };
 
-export function DocumentWorkspace({ startupId, startupName = "Startup chưa đặt tên", selectedDocType, onSelectDocType, onOpenReport }: DocumentWorkspaceProps) {
+export function DocumentWorkspace({ startupId, startupName = "Unnamed startup", selectedDocType, onSelectDocType, onOpenReport }: DocumentWorkspaceProps) {
   const [downloading, setDownloading] = useState<DocumentExportFormat | null>(null);
   const [previewDocument, setPreviewDocument] = useState<StartupDocument | null>(null);
   const [compareDocument, setCompareDocument] = useState<StartupDocument | null>(null);
@@ -56,18 +56,18 @@ export function DocumentWorkspace({ startupId, startupName = "Startup chưa đ�
       void queryClient.invalidateQueries({ queryKey: ["document-history", startupId, selectedDocType] });
       void queryClient.invalidateQueries({ queryKey: ["startup-overview", startupId] });
       void queryClient.invalidateQueries({ queryKey: ["startup-report", startupId] });
-      showToast(`Đã khôi phục thành phiên bản ${document.version}.`, "success");
+      showToast(`Restored version ${document.version}.`, "success");
     },
-    onError: () => showToast("Không thể khôi phục phiên bản. Vui lòng thử lại.", "error")
+    onError: () => showToast("Unable to restore the version. Please try again.", "error")
   });
 
   async function handleDownload(format: DocumentExportFormat) {
     setDownloading(format);
     try {
       await downloadDocument(startupId, selectedDocType, format);
-      showToast(`Đã tải ${selectedLabel} dạng ${format.toUpperCase()}.`, "success");
+      showToast(`${selectedLabel} downloaded as ${format.toUpperCase()}.`, "success");
     } catch {
-      showToast("Không thể tải tài liệu. Vui lòng thử lại.", "error");
+      showToast("Unable to download the document. Please try again.", "error");
     } finally {
       setDownloading(null);
     }
@@ -77,19 +77,19 @@ export function DocumentWorkspace({ startupId, startupName = "Startup chưa đ�
     <section className="workspace-section document-workspace" aria-labelledby="documents-heading" id="documents">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Kho tài liệu</p>
+          <p className="eyebrow">Document workspace</p>
           <h2 id="documents-heading">{selectedLabel}</h2>
-          <p className="section-description">Tài liệu được AI Coach cập nhật theo nội dung trao đổi của bạn.</p>
+          <p className="section-description">AI Coach updates documents based on your conversation.</p>
         </div>
         {currentDocumentQuery.data ? (
-          <div className="document-actions" aria-label={`Tải ${selectedLabel} của ${startupName}`}>
-            <button type="button" className="secondary-button" disabled={downloading !== null} onClick={() => void handleDownload("docx")}>{downloading === "docx" ? "Đang tạo..." : "Tải DOCX"}</button>
-            <button type="button" className="primary-button" disabled={downloading !== null} onClick={() => void handleDownload("pdf")}>{downloading === "pdf" ? "Đang tạo..." : "Tải PDF"}</button>
+          <div className="document-actions" aria-label={`Download ${selectedLabel} for ${startupName}`}>
+            <button type="button" className="secondary-button" disabled={downloading !== null} onClick={() => void handleDownload("docx")}>{downloading === "docx" ? "Creating..." : "Download DOCX"}</button>
+            <button type="button" className="primary-button" disabled={downloading !== null} onClick={() => void handleDownload("pdf")}>{downloading === "pdf" ? "Creating..." : "Download PDF"}</button>
           </div>
         ) : null}
       </div>
 
-      <div className="document-tabs" role="tablist" aria-label="Loại tài liệu">
+      <div className="document-tabs" role="tablist" aria-label="Document types">
         {DOCUMENT_TYPES.map((docType) => (
           <button
             type="button"
@@ -102,10 +102,10 @@ export function DocumentWorkspace({ startupId, startupName = "Startup chưa đ�
             {DOCUMENT_LABELS[docType]}
           </button>
         ))}
-        {onOpenReport ? <button type="button" role="tab" aria-selected="false" className="document-tab" onClick={onOpenReport}>Hồ sơ tổng hợp</button> : null}
+        {onOpenReport ? <button type="button" role="tab" aria-selected="false" className="document-tab" onClick={onOpenReport}>Startup report</button> : null}
       </div>
 
-      {selectedDocType === "funding" && displayedDocument ? <div className="pitch-mode-switch" role="tablist" aria-label="Chế độ xem gọi vốn"><button type="button" role="tab" aria-selected={fundingMode === "content"} className={fundingMode === "content" ? "selected" : ""} onClick={() => setFundingMode("content")}>Nội dung</button><button type="button" role="tab" aria-selected={fundingMode === "presentation"} className={fundingMode === "presentation" ? "selected" : ""} onClick={() => setFundingMode("presentation")}>Trình chiếu</button></div> : null}
+      {selectedDocType === "funding" && displayedDocument ? <div className="pitch-mode-switch" role="tablist" aria-label="Funding view mode"><button type="button" role="tab" aria-selected={fundingMode === "content"} className={fundingMode === "content" ? "selected" : ""} onClick={() => setFundingMode("content")}>Content</button><button type="button" role="tab" aria-selected={fundingMode === "presentation"} className={fundingMode === "presentation" ? "selected" : ""} onClick={() => setFundingMode("presentation")}>Presentation</button></div> : null}
 
       {currentDocumentQuery.isLoading ? (
         <Skeleton lines={5} />
@@ -114,14 +114,14 @@ export function DocumentWorkspace({ startupId, startupName = "Startup chưa đ�
       ) : displayedDocument ? (
         selectedDocType === "funding" && fundingMode === "presentation" ? <PitchDeckView startupId={startupId} startupName={startupName} slides={pitchSlides} /> :
         <>
-        {previewDocument ? <div className="version-preview-banner"><span>Bạn đang xem phiên bản {previewDocument.version}</span><button type="button" className="text-button" onClick={() => setPreviewDocument(null)}>Quay lại hiện tại</button></div> : null}
+        {previewDocument ? <div className="version-preview-banner"><span>You are viewing version {previewDocument.version}</span><button type="button" className="text-button" onClick={() => setPreviewDocument(null)}>Back to current</button></div> : null}
         <div className="document-view document-page-preview">
           <header className="document-page-heading">
             <p>{startupName}</p>
             <h3>{selectedLabel}</h3>
           </header>
           <div className="document-meta">
-            <span className="status-pill">Phiên bản {displayedDocument.version}</span>
+            <span className="status-pill">Version {displayedDocument.version}</span>
             <span>{formatDate(displayedDocument.created_at)}</span>
           </div>
           <DocumentLayout docType={selectedDocType} document={displayedDocument} />
@@ -142,9 +142,9 @@ export function DocumentWorkspace({ startupId, startupName = "Startup chưa đ�
       {compareDocument && currentDocumentQuery.data ? <VersionCompare older={compareDocument} current={currentDocumentQuery.data} onClose={() => setCompareDocument(null)} /> : null}
       <ConfirmationDialog
         open={pendingRestore !== null}
-        title={pendingRestore ? `Khôi phục phiên bản ${pendingRestore.version}?` : "Khôi phục phiên bản?"}
-        description="Nội dung được chọn sẽ được sao chép thành phiên bản mới. Các phiên bản hiện có vẫn được giữ nguyên."
-        confirmLabel={restoreMutation.isPending ? "Đang khôi phục..." : "Khôi phục phiên bản"}
+        title={pendingRestore ? `Restore version ${pendingRestore.version}?` : "Restore version?"}
+        description="The selected content will be copied into a new version. Existing versions will be preserved."
+        confirmLabel={restoreMutation.isPending ? "Restoring..." : "Restore version"}
         onConfirm={() => { if (pendingRestore && !restoreMutation.isPending) restoreMutation.mutate(pendingRestore); }}
         onCancel={() => { if (!restoreMutation.isPending) setPendingRestore(null); }}
       />
@@ -156,8 +156,8 @@ function EmptyDocumentState({ label }: { label: string }) {
   return (
     <div className="document-empty">
       <div className="empty-icon" aria-hidden="true">▤</div>
-      <h3>Chưa có {label}</h3>
-      <p>Trò chuyện với AI Coach ở giai đoạn tương ứng. Tài liệu sẽ xuất hiện tại đây sau khi có đủ thông tin.</p>
+      <h3>No {label} yet</h3>
+      <p>Chat with AI Coach during the corresponding stage. The document will appear once enough information is available.</p>
     </div>
   );
 }
@@ -169,10 +169,10 @@ function readPitchSlides(value: unknown): PitchSlide[] {
 
 function formatDate(value: string | null): string {
   if (!value) {
-    return "Chưa có thời gian";
+    return "No timestamp";
   }
 
-  return new Intl.DateTimeFormat("vi-VN", {
+  return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));

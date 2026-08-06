@@ -51,7 +51,7 @@ export async function downloadDocument(
     headers: { Accept: format === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }
   });
   if (!response.ok) {
-    throw new Error(`Không thể tải tài liệu (${response.status}).`);
+    throw new Error(`Unable to download document (${response.status}).`);
   }
   const blobUrl = URL.createObjectURL(await response.blob());
   const link = document.createElement("a");

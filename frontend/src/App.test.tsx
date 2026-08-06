@@ -20,9 +20,9 @@ describe("local profile onboarding", () => {
 
     renderApp();
 
-    expect(await screen.findByRole("heading", { name: "Mình nên gọi bạn là gì?" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Tên của bạn")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "What should I call you?" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Your name")).toBeInTheDocument();
     expect(screen.queryByLabelText(/email/i)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText(/mật khẩu/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
   });
 });

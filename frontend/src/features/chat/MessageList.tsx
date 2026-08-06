@@ -17,17 +17,17 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
     return (
       <div className="chat-empty">
         <div className="empty-icon" aria-hidden="true">✦</div>
-        <h3>Bắt đầu cuộc trò chuyện</h3>
-        <p>Hãy chia sẻ điều bạn đã biết về ý tưởng. Coach sẽ đặt câu hỏi và giúp bạn xác định bước tiếp theo.</p>
+        <h3>Start the conversation</h3>
+        <p>Share what you know about your idea. Your Coach will ask questions and help identify the next step.</p>
       </div>
     );
   }
 
   return (
-    <div className="message-list" aria-label="Tin nhắn trò chuyện">
+    <div className="message-list" aria-label="Conversation messages">
       {messages.map((message) => (
         <article className={`chat-message chat-message-${message.role}`} key={message.sequence}>
-          <p className="message-role">{message.role === "user" ? "Bạn" : "AI Coach"}</p>
+          <p className="message-role">{message.role === "user" ? "You" : "AI Coach"}</p>
           {message.role === "assistant" ? (
             <div className="message-content">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>

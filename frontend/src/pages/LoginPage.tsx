@@ -20,14 +20,14 @@ export function LoginPage() {
     clearError();
     try {
       await login(email, password);
-      showToast("Đăng nhập thành công. Chào mừng bạn quay lại!", "success");
+      showToast("Login successful. Welcome back!", "success");
     } catch {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <AuthPage title="Chào mừng trở lại" subtitle="Đăng nhập để tiếp tục hành trình xây dựng startup của bạn.">
+    <AuthPage title="Welcome back" subtitle="Log in to continue building your startup.">
       <form className="auth-form" onSubmit={onSubmit}>
         <label>
           Email
@@ -40,12 +40,12 @@ export function LoginPage() {
           />
         </label>
         <label>
-          Mật khẩu
+          Password
           <PasswordField value={password} onChange={setPassword} autoComplete="current-password" />
         </label>
         {error ? <p className="form-error">{error}</p> : null}
         <button type="submit" className="primary-button" disabled={isSubmitting}>
-          {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
+          {isSubmitting ? "Logging in..." : "Log in"}
         </button>
       </form>
       <AuthSwitchLink mode="login" />
@@ -71,12 +71,12 @@ export function AuthPage({
             <strong>AI Startup Coach</strong>
           </div>
           <div className="auth-brand-message">
-            <p className="eyebrow">Từ ý tưởng đến kế hoạch</p>
-            <h2>Xây startup từng bước, với một người đồng hành luôn sẵn sàng.</h2>
-            <p>Khám phá vấn đề, kiểm chứng mô hình và hoàn thiện tài liệu trong một không gian làm việc rõ ràng.</p>
+            <p className="eyebrow">From idea to plan</p>
+            <h2>Build your startup step by step with an always-ready partner.</h2>
+            <p>Explore problems, validate your model, and complete your documents in one focused workspace.</p>
           </div>
           <div className="journey-preview">
-            <span>01 · Ý tưởng</span><span>02 · Mô hình</span><span>03 · Sản phẩm</span><span>04 · Gọi vốn</span>
+            <span>01 · Idea</span><span>02 · Model</span><span>03 · Product</span><span>04 · Funding</span>
           </div>
         </div>
         <div className="auth-form-panel">

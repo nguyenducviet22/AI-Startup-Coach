@@ -40,11 +40,11 @@ export function StageControls({
     <section className="workspace-section" aria-labelledby="stage-heading">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Lộ trình</p>
-          <h2 id="stage-heading">{isCompleted ? "Hoàn thành hành trình" : STAGE_LABELS[currentStage]}</h2>
-          <p className="section-description">Mỗi giai đoạn giúp bạn kiểm chứng một phần quan trọng của startup.</p>
+          <p className="eyebrow">Journey</p>
+          <h2 id="stage-heading">{isCompleted ? "Journey completed" : STAGE_LABELS[currentStage]}</h2>
+          <p className="section-description">Each stage helps validate an important part of your startup.</p>
         </div>
-        {isCompleted ? <span className="status-pill">Đã hoàn thành</span> : null}
+        {isCompleted ? <span className="status-pill">Completed</span> : null}
       </div>
 
       <StageStepper currentStage={currentStage} />
@@ -57,16 +57,16 @@ export function StageControls({
             onClick={onAdvanceStage}
             disabled={isAdvancing}
           >
-            {isAdvancing ? "Đang chuyển..." : `Tiếp tục đến ${nextLabel}`}
+            {isAdvancing ? "Advancing..." : `Continue to ${nextLabel}`}
           </button>
         ) : (
-          <p className="stage-complete-copy">Bạn đã hoàn thành lộ trình coaching có hướng dẫn.</p>
+          <p className="stage-complete-copy">You have completed the guided coaching journey.</p>
         )}
 
         {backOptions.length > 0 ? (
           <form className="set-stage-form" onSubmit={handleSetStage}>
             <label>
-              Xem lại giai đoạn
+              Review a stage
               <select
                 value={targetStage}
                 onChange={(event) => setTargetStage(event.target.value as StageName)}
@@ -79,7 +79,7 @@ export function StageControls({
               </select>
             </label>
             <button type="submit" className="secondary-button" disabled={!targetStage || isSettingStage}>
-              {isSettingStage ? "Đang cập nhật..." : "Quay lại"}
+              {isSettingStage ? "Updating..." : "Go back"}
             </button>
           </form>
         ) : null}

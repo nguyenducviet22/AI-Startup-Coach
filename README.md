@@ -99,15 +99,15 @@ docs/       Product specifications, architecture decisions, and handoff notes
    cp .env.example .env
    ```
 
-2. Configure the database and an OpenAI-compatible LLM endpoint in `.env`. For a local 9Router setup, use `http://localhost:20128/v1` as `LLM_BASE_URL`.
+2. Configure the database, 9Router API key, and model in `.env`. The Compose setup runs 9Router as the `llm-router` service and automatically routes the backend to `http://llm-router:20128/v1`.
 
 3. Start the stack:
 
    ```bash
-   docker compose -f compose.yaml up --build
+   docker compose up --build
    ```
 
-4. Open the frontend at `http://localhost:5173`. The backend health endpoint is available at `http://localhost:8000/health`, and FastAPI documentation is available at `http://localhost:8000/docs`.
+4. Open the frontend at `http://localhost:5173`. The 9Router dashboard is available at `http://localhost:20128`; configure its upstream provider there and copy the generated API key/model into `.env`. For OpenAI Codex, use `Providers -> Connect Codex -> OAuth login`; port `1455` is published for the OAuth callback. The backend health endpoint is available at `http://localhost:8000/health`, and FastAPI documentation is available at `http://localhost:8000/docs`.
 
 ## Run without Docker
 

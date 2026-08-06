@@ -20,25 +20,25 @@ export function VersionHistory({ documents, isLoading, error, onPreview, onCompa
   }
 
   if (documents.length === 0) {
-    return <p className="document-muted">Chưa có phiên bản trước.</p>;
+    return <p className="document-muted">No previous versions.</p>;
   }
 
   return (
     <section className="version-history" aria-labelledby="version-history-heading">
-      <h3 id="version-history-heading">Lịch sử phiên bản</h3>
+      <h3 id="version-history-heading">Version history</h3>
       <ol>
         {documents.map((document) => (
           <li key={document.id}>
             <div className="version-history-copy"><span>
-              Phiên bản {document.version}
-              {document.is_current ? " · hiện tại" : ""}
+              Version {document.version}
+              {document.is_current ? " · current" : ""}
             </span>
             <time dateTime={document.created_at ?? undefined}>{formatDate(document.created_at)}</time>
             </div>
             {!document.is_current ? <div className="version-history-actions">
-              {onPreview ? <button type="button" className="text-button" aria-label={`Xem phiên bản ${document.version}`} onClick={() => onPreview(document)}>Xem lại</button> : null}
-              {onCompare ? <button type="button" className="text-button" aria-label={`So sánh phiên bản ${document.version}`} onClick={() => onCompare(document)}>So sánh</button> : null}
-              {onRestore ? <button type="button" className="text-button" aria-label={`Khôi phục phiên bản ${document.version}`} onClick={() => onRestore(document)}>Khôi phục</button> : null}
+              {onPreview ? <button type="button" className="text-button" aria-label={`Preview version ${document.version}`} onClick={() => onPreview(document)}>Preview</button> : null}
+              {onCompare ? <button type="button" className="text-button" aria-label={`Compare version ${document.version}`} onClick={() => onCompare(document)}>Compare</button> : null}
+              {onRestore ? <button type="button" className="text-button" aria-label={`Restore version ${document.version}`} onClick={() => onRestore(document)}>Restore</button> : null}
             </div> : null}
           </li>
         ))}
@@ -49,10 +49,10 @@ export function VersionHistory({ documents, isLoading, error, onPreview, onCompa
 
 function formatDate(value: string | null): string {
   if (!value) {
-    return "Chưa có thời gian";
+    return "No timestamp";
   }
 
-  return new Intl.DateTimeFormat("vi-VN", {
+  return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short"
   }).format(new Date(value));

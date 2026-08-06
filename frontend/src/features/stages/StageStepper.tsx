@@ -10,7 +10,7 @@ export function StageStepper({ currentStage }: StageStepperProps) {
   const currentIndex = isCompleted ? STAGES.length : STAGES.indexOf(currentStage);
 
   return (
-    <div className="stage-stepper" aria-label="Tiến độ các giai đoạn startup">
+    <div className="stage-stepper" aria-label="Startup stage progress">
       {STAGES.map((stage, index) => {
         const status = index < currentIndex ? "complete" : index === currentIndex ? "current" : "upcoming";
         return (

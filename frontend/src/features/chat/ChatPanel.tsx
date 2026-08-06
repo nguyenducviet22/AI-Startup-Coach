@@ -61,7 +61,7 @@ export function ChatPanel({
       void queryClient.invalidateQueries({ queryKey: ["startup-report", startupId] });
       updateWorkspace(startupId, { chatDraft: "" });
     },
-    onError: () => showToast("Không thể gửi tin nhắn. Vui lòng thử lại.", "error")
+    onError: () => showToast("Unable to send your message. Please try again.", "error")
   });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -73,17 +73,22 @@ export function ChatPanel({
     sendMutation.mutate(message);
   }
 
+  function handleAdvanceStage() {
+    setReadiness(null);
+    onAdvanceStage();
+  }
+
   return (
     <section className="workspace-section chat-panel" aria-labelledby="chat-heading">
       <div className="section-heading">
         <div>
           <p className="eyebrow">AI Coach</p>
-          <h2 id="chat-heading">{isCompleted ? "Lịch sử coaching" : "Trò chuyện cùng Coach"}</h2>
-          <p className="section-description">Trao đổi tự nhiên; Coach sẽ tổng hợp thông tin vào tài liệu của bạn.</p>
+          <h2 id="chat-heading">{isCompleted ? "Coaching history" : "Chat with your Coach"}</h2>
+          <p className="section-description">Share naturally; your Coach will organize the information into your documents.</p>
         </div>
         {!isCompleted && currentDocumentLabel && onOpenCurrentDocument ? (
           <button type="button" className="secondary-button" onClick={onOpenCurrentDocument}>
-            Mở {currentDocumentLabel}
+            Open {currentDocumentLabel}
           </button>
         ) : null}
       </div>
@@ -92,8 +97,8 @@ export function ChatPanel({
 
       {isCompleted ? (
         <div className="completion-summary">
-          <h3>Hành trình coaching đã hoàn thành</h3>
-          <p>Lịch sử trò chuyện vẫn được lưu tại đây. Bạn có thể xem lại và hoàn thiện các tài liệu đã tạo.</p>
+          <h3>Coaching journey completed</h3>
+          <p>Your chat history is saved here. You can review it and refine your generated documents.</p>
         </div>
       ) : (
         <>
@@ -101,22 +106,22 @@ export function ChatPanel({
             readiness={readiness}
             currentStage={currentStage}
             isAdvancing={isAdvancing}
-            onAdvanceStage={onAdvanceStage}
+            onAdvanceStage={handleAdvanceStage}
           />
 
           <form className="message-composer" onSubmit={handleSubmit}>
             <label>
-              Tin nhắn
+              Message
               <textarea
                 value={draft}
                 onChange={(event) => updateWorkspace(startupId, { chatDraft: event.target.value })}
                 rows={4}
-                placeholder="Chia sẻ điều bạn đã biết, câu hỏi hoặc giả định cần kiểm chứng..."
+                placeholder="Share what you know, questions, or assumptions to validate..."
               />
             </label>
             {sendMutation.error ? <p className="form-error">{sendMutation.error.message}</p> : null}
             <button type="submit" className="primary-button" disabled={!draft.trim() || sendMutation.isPending}>
-              {sendMutation.isPending ? "Thinking..." : "Gửi tin nhắn"}
+              {sendMutation.isPending ? "Thinking..." : "Send message"}
             </button>
           </form>
         </>

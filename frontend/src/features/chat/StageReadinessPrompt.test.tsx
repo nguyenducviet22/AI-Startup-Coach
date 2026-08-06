@@ -15,13 +15,14 @@ describe("StageReadinessPrompt", () => {
       />
     );
 
-    await userEvent.click(screen.getByRole("button", { name: "Tiếp tục đến Mô hình kinh doanh" }));
+    await userEvent.click(screen.getByRole("button", { name: "Continue to Business Model" }));
 
-    expect(screen.getByText("Sẵn sàng cho giai đoạn tiếp theo")).toBeInTheDocument();
     expect(onAdvanceStage).toHaveBeenCalledOnce();
+    expect(screen.getByText("Ready for the next stage")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /collapse readiness/i })).not.toBeInTheDocument();
   });
 
-  it("renders missing fields when readiness is false", () => {
+  it("collapses and expands missing fields when readiness is false", async () => {
     render(
       <StageReadinessPrompt
         readiness={{ ready: false, missing_fields: ["customer_segments", "channels"] }}
@@ -30,9 +31,18 @@ describe("StageReadinessPrompt", () => {
       />
     );
 
-    expect(screen.getByText("Cần thêm thông tin")).toBeInTheDocument();
-    expect(screen.getByText("Phân khúc khách hàng")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /tiếp tục/i })).not.toBeInTheDocument();
+    expect(screen.getByText("More information needed")).toBeInTheDocument();
+    expect(screen.getByText("Customer segments")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /continue/i })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Collapse readiness notice" }));
+
+    expect(screen.getByText("More information needed")).toBeInTheDocument();
+    expect(screen.queryByText("Customer segments")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Expand readiness notice" }));
+
+    expect(screen.getByText("Customer segments")).toBeInTheDocument();
   });
 
   it("does not render in the completed stage", () => {

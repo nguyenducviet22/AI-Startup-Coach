@@ -50,7 +50,7 @@ export function OpenRouterKeyControl() {
         type="button"
         className={hasApiKey ? "api-key-button configured" : "api-key-button"}
         onClick={openDialog}
-        aria-label={hasApiKey ? "OpenRouter API key đã được cấu hình" : "Thêm OpenRouter API key"}
+        aria-label={hasApiKey ? "OpenRouter API key configured" : "Add OpenRouter API key"}
       >
         <KeyIcon />
         <span>API key</span>
@@ -69,9 +69,9 @@ export function OpenRouterKeyControl() {
             onKeyDown={(event) => trapDialogKeyboard(event, dialogRef.current, closeDialog)}
           >
             <div className="dialog-icon api-key-dialog-icon" aria-hidden="true"><KeyIcon /></div>
-            <h2 id="api-key-dialog-title">Kết nối OpenRouter</h2>
+            <h2 id="api-key-dialog-title">Connect OpenRouter</h2>
             <p id="api-key-dialog-description">
-              Nhập <code>OPENROUTER_API_KEY</code> để AI Coach sử dụng OpenRouter trong phiên làm việc này.
+              Enter <code>OPENROUTER_API_KEY</code> for AI Coach to use OpenRouter in this session.
             </p>
             <form className="api-key-form" onSubmit={saveApiKey}>
               <label htmlFor="openrouter-api-key">OpenRouter API key</label>
@@ -91,18 +91,18 @@ export function OpenRouterKeyControl() {
                   type="button"
                   className="password-toggle"
                   onClick={() => setIsVisible((current) => !current)}
-                  aria-label={isVisible ? "Ẩn API key" : "Hiện API key"}
+                  aria-label={isVisible ? "Hide API key" : "Show API key"}
                   aria-pressed={isVisible}
                 >
-                  {isVisible ? "Ẩn" : "Hiện"}
+                  {isVisible ? "Hide" : "Show"}
                 </button>
               </div>
-              <p className="api-key-privacy">Key chỉ được lưu trong tab trình duyệt này và chỉ gửi đến backend khi bạn nhắn cho AI Coach.</p>
+              <p className="api-key-privacy">The key is stored only in this browser tab and is sent to the backend only when you message AI Coach.</p>
               <div className="dialog-actions api-key-dialog-actions">
-                {hasApiKey ? <button type="button" className="danger-text-button" onClick={removeApiKey}>Xóa key</button> : null}
+                {hasApiKey ? <button type="button" className="danger-text-button" onClick={removeApiKey}>Remove key</button> : null}
                 <span />
-                <button type="button" className="secondary-button" onClick={closeDialog}>Hủy</button>
-                <button type="submit" className="primary-button" disabled={!apiKey.trim()}>Lưu key</button>
+                <button type="button" className="secondary-button" onClick={closeDialog}>Cancel</button>
+                <button type="submit" className="primary-button" disabled={!apiKey.trim()}>Save key</button>
               </div>
             </form>
           </section>

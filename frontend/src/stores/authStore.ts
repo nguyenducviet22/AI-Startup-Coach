@@ -69,17 +69,17 @@ function messageFromError(error: unknown): string {
   if (error instanceof Error) {
     return AUTH_ERROR_MESSAGES[error.message] ?? error.message;
   }
-  return "Đã có lỗi xảy ra. Vui lòng thử lại.";
+  return "Something went wrong. Please try again.";
 }
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
-  "Email is already registered.": "Email này đã được đăng ký.",
-  "Email or password is incorrect.": "Email hoặc mật khẩu không chính xác.",
-  "Refresh token is required.": "Phiên đăng nhập không hợp lệ.",
-  "Refresh token is invalid.": "Phiên đăng nhập không hợp lệ.",
-  "Refresh token has expired.": "Phiên đăng nhập đã hết hạn.",
-  "Refresh token reuse was detected.": "Phiên đăng nhập không còn an toàn. Vui lòng đăng nhập lại.",
-  "Refresh token has been revoked.": "Phiên đăng nhập đã kết thúc."
+  "Email is already registered.": "This email is already registered.",
+  "Email or password is incorrect.": "Email or password is incorrect.",
+  "Refresh token is required.": "Your session is invalid.",
+  "Refresh token is invalid.": "Your session is invalid.",
+  "Refresh token has expired.": "Your session has expired.",
+  "Refresh token reuse was detected.": "Your session is no longer secure. Please log in again.",
+  "Refresh token has been revoked.": "Your session has ended."
 };
 
 onAuthFailure(() => {

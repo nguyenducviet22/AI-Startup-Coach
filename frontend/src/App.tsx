@@ -11,13 +11,13 @@ export function App() {
 
   let page: React.ReactNode;
   if (profileQuery.isLoading) {
-    page = <main className="app-loading" aria-label="Đang mở không gian làm việc"><Skeleton lines={4} /></main>;
+    page = <main className="app-loading" aria-label="Opening workspace"><Skeleton lines={4} /></main>;
   } else if (profileQuery.error) {
     page = (
       <main className="app-error-state">
-        <h1>Chưa thể mở AI Startup Coach</h1>
+        <h1>Unable to open AI Startup Coach</h1>
         <p>{profileQuery.error.message}</p>
-        <button type="button" className="primary-button" onClick={() => void profileQuery.refetch()}>Thử lại</button>
+        <button type="button" className="primary-button" onClick={() => void profileQuery.refetch()}>Try again</button>
       </main>
     );
   } else if (!profileQuery.data?.configured) {
@@ -49,15 +49,15 @@ function ProfileOnboarding() {
     <main className="onboarding-page">
       <section className="onboarding-card" aria-labelledby="onboarding-title">
         <p className="tool-name">AI Startup Coach</p>
-        <p className="eyebrow">Chào mừng bạn</p>
-        <h1 id="onboarding-title">Mình nên gọi bạn là gì?</h1>
-        <p>Coach sẽ dùng tên này để đồng hành cùng bạn trong suốt hành trình xây dựng startup.</p>
+        <p className="eyebrow">Welcome</p>
+        <h1 id="onboarding-title">What should I call you?</h1>
+        <p>Your coach will use this name throughout your startup-building journey.</p>
         <form onSubmit={submit} className="onboarding-form">
-          <label htmlFor="profile-name">Tên của bạn</label>
-          <input id="profile-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={255} autoFocus placeholder="Ví dụ: Nguyễn Thị Nhã Uyên" />
+          <label htmlFor="profile-name">Your name</label>
+          <input id="profile-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={255} autoFocus placeholder="e.g. Alex Johnson" />
           {mutation.error ? <p className="form-error">{mutation.error.message}</p> : null}
           <button type="submit" className="primary-button" disabled={!name.trim() || mutation.isPending}>
-            {mutation.isPending ? "Đang lưu..." : "Bắt đầu hành trình"}
+            {mutation.isPending ? "Saving..." : "Start journey"}
           </button>
         </form>
       </section>

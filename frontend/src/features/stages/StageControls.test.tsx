@@ -13,8 +13,8 @@ describe("StageControls", () => {
       />
     );
 
-    expect(screen.getByRole("heading", { name: "Hoàn thành hành trình" })).toBeInTheDocument();
-    expect(screen.getAllByText(/hoàn thành/i).length).toBeGreaterThan(0);
-    expect(screen.queryByRole("button", { name: /tiếp tục/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Journey completed" })).toBeInTheDocument();
+    expect(screen.getAllByText(/completed/i).length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /continue/i })).not.toBeInTheDocument();
   });
 });

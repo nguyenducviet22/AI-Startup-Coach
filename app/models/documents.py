@@ -142,8 +142,7 @@ class FundingGuide(Base):
     )
     pitch_outline: Mapped[list[dict[str, str]] | None] = mapped_column(JSONB)
     valuation_notes: Mapped[str | None] = mapped_column(Text)
-    funding_stage_recommendation: Mapped[str | None] = mapped_column(String(100))
+    funding_stage_recommendation: Mapped[str | None] = mapped_column(Text)
     version: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     is_current: Mapped[bool | None] = mapped_column(Boolean, server_default=text("true"))
     created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), server_default=text("now()"))
-

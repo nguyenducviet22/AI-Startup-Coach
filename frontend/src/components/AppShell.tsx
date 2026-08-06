@@ -67,9 +67,9 @@ export function AppShell({ profileName }: { profileName: string }) {
     onSuccess(profile) {
       queryClient.setQueryData(["profile"], profile);
       setIsEditingProfile(false);
-      showToast("Đã cập nhật tên của bạn.", "success");
+      showToast("Your name was updated.", "success");
     },
-    onError: () => showToast("Không thể cập nhật tên. Vui lòng thử lại.", "error")
+    onError: () => showToast("Unable to update your name. Please try again.", "error")
   });
 
   const createMutation = useMutation({
@@ -81,18 +81,18 @@ export function AppShell({ profileName }: { profileName: string }) {
       setSelectedStartupId(startup.id);
       setLastStartupId(startup.id);
       setIsSidebarOpen(false);
-      showToast("Đã tạo startup mới.", "success");
+      showToast("New startup created.", "success");
     },
-    onError: () => showToast("Không thể tạo startup. Vui lòng thử lại.", "error")
+    onError: () => showToast("Unable to create startup. Please try again.", "error")
   });
 
   const renameMutation = useMutation({
     mutationFn: ({ startupId, name }: { startupId: string; name: string }) => renameStartup(startupId, name),
     onSuccess(startup) {
       updateStartupCache(queryClient, startup);
-      showToast("Đã đổi tên startup.", "success");
+      showToast("Startup renamed.", "success");
     },
-    onError: () => showToast("Không thể đổi tên startup. Vui lòng thử lại.", "error")
+    onError: () => showToast("Unable to rename startup. Please try again.", "error")
   });
 
   const advanceMutation = useMutation({
@@ -100,9 +100,9 @@ export function AppShell({ profileName }: { profileName: string }) {
     onSuccess(startup) {
       updateStartupCache(queryClient, startup);
       void queryClient.invalidateQueries({ queryKey: ["startup-overview", startup.id] });
-      showToast(`Đã chuyển sang ${STAGE_LABELS[startup.current_stage]}.`, "success");
+      showToast(`Moved to ${STAGE_LABELS[startup.current_stage]}.`, "success");
     },
-    onError: () => showToast("Không thể chuyển giai đoạn. Vui lòng thử lại.", "error")
+    onError: () => showToast("Unable to advance the stage. Please try again.", "error")
   });
 
   const setStageMutation = useMutation({
@@ -110,9 +110,9 @@ export function AppShell({ profileName }: { profileName: string }) {
     onSuccess(startup) {
       updateStartupCache(queryClient, startup);
       void queryClient.invalidateQueries({ queryKey: ["startup-overview", startup.id] });
-      showToast(`Đã quay lại ${STAGE_LABELS[startup.current_stage]}.`, "success");
+      showToast(`Returned to ${STAGE_LABELS[startup.current_stage]}.`, "success");
     },
-    onError: () => showToast("Không thể cập nhật giai đoạn. Vui lòng thử lại.", "error")
+    onError: () => showToast("Unable to update the stage. Please try again.", "error")
   });
 
   function confirmPendingAction() {
@@ -136,26 +136,26 @@ export function AppShell({ profileName }: { profileName: string }) {
           <OpenRouterKeyControl />
           {isEditingProfile ? (
             <form className="account-edit" onSubmit={(event) => { event.preventDefault(); if (profileDraft.trim()) profileMutation.mutate(profileDraft.trim()); }}>
-              <label className="sr-only" htmlFor="account-name">Tên của bạn</label>
+              <label className="sr-only" htmlFor="account-name">Your name</label>
               <input id="account-name" value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} maxLength={255} autoFocus />
-              <button type="submit" className="text-button" disabled={!profileDraft.trim() || profileMutation.isPending}>Lưu</button>
-              <button type="button" className="text-button muted" onClick={() => { setProfileDraft(profileName); setIsEditingProfile(false); }}>Hủy</button>
+              <button type="submit" className="text-button" disabled={!profileDraft.trim() || profileMutation.isPending}>Save</button>
+              <button type="button" className="text-button muted" onClick={() => { setProfileDraft(profileName); setIsEditingProfile(false); }}>Cancel</button>
             </form>
           ) : (
-            <button type="button" className="account-button" onClick={() => setIsEditingProfile(true)} aria-label="Đổi tên người dùng">
-              <span className="account-copy"><strong>{profileName}</strong><span>Nhà sáng lập</span></span>
+            <button type="button" className="account-button" onClick={() => setIsEditingProfile(true)} aria-label="Rename user">
+              <span className="account-copy"><strong>{profileName}</strong><span>Founder</span></span>
             </button>
           )}
         </div>
       </header>
 
       <button type="button" className="mobile-sidebar-toggle" aria-expanded={isSidebarOpen} aria-controls="startup-sidebar" onClick={() => setIsSidebarOpen((current) => !current)}>
-        <span>Startup của bạn</span><strong>{selectedStartup?.name ?? "Chưa chọn"}</strong><span aria-hidden="true">{isSidebarOpen ? "Thu gọn ↑" : "Mở danh sách ↓"}</span>
+        <span>Your startups</span><strong>{selectedStartup?.name ?? "None selected"}</strong><span aria-hidden="true">{isSidebarOpen ? "Collapse ↑" : "Open list ↓"}</span>
       </button>
 
       <div className="workspace-layout">
-        <aside id="startup-sidebar" className="startup-sidebar" data-open={isSidebarOpen} aria-label="Danh sách startup">
-          <div className="sidebar-heading"><div><p className="eyebrow">Không gian</p><h2>Startup của bạn</h2></div><span className="count-badge">{startups.length}</span></div>
+        <aside id="startup-sidebar" className="startup-sidebar" data-open={isSidebarOpen} aria-label="Startup list">
+          <div className="sidebar-heading"><div><p className="eyebrow">Workspace</p><h2>Your startups</h2></div><span className="count-badge">{startups.length}</span></div>
           <CreateStartupForm isCreating={createMutation.isPending} error={createMutation.error} onCreate={(name) => createMutation.mutate(name)} />
           <StartupList startups={orderedStartups} selectedStartupId={selectedStartup?.id ?? null} isLoading={startupsQuery.isLoading} error={startupsQuery.error} onSelect={selectStartup} />
         </aside>
@@ -175,7 +175,7 @@ export function AppShell({ profileName }: { profileName: string }) {
           ) : startupsQuery.isLoading ? (
             <section className="workspace-section"><Skeleton lines={6} /></section>
           ) : (
-            <section className="empty-workspace"><p className="eyebrow">Bắt đầu tại đây</p><h2>Tạo startup đầu tiên</h2><p>Đặt tên cho ý tưởng; AI Coach sẽ dẫn bạn qua từng giai đoạn.</p><button type="button" className="primary-button mobile-only" onClick={() => setIsSidebarOpen(true)}>Tạo startup</button></section>
+            <section className="empty-workspace"><p className="eyebrow">Start here</p><h2>Create your first startup</h2><p>Name your idea; AI Coach will guide you through each stage.</p><button type="button" className="primary-button mobile-only" onClick={() => setIsSidebarOpen(true)}>Create startup</button></section>
           )}
         </section>
       </div>
@@ -188,7 +188,7 @@ export function AppShell({ profileName }: { profileName: string }) {
 function CreateStartupForm({ isCreating, error, onCreate }: { isCreating: boolean; error: Error | null; onCreate: (name: string | null) => void }) {
   const [name, setName] = useState("");
   function onSubmit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); onCreate(name.trim() || null); setName(""); }
-  return <form className="create-startup-form" onSubmit={onSubmit}><label>Tạo startup mới<input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="Ví dụ: TutorOS" maxLength={120} /></label>{error ? <p className="form-error">{error.message}</p> : null}<button type="submit" className="primary-button" disabled={isCreating}>{isCreating ? "Đang tạo..." : "+ Tạo startup"}</button></form>;
+  return <form className="create-startup-form" onSubmit={onSubmit}><label>Create a new startup<input type="text" value={name} onChange={(event) => setName(event.target.value)} placeholder="e.g. TutorOS" maxLength={120} /></label>{error ? <p className="form-error">{error.message}</p> : null}<button type="submit" className="primary-button" disabled={isCreating}>{isCreating ? "Creating..." : "+ Create startup"}</button></form>;
 }
 
 type StartupFilter = "all" | "active" | "completed";
@@ -200,7 +200,7 @@ export function StartupList({ startups, selectedStartupId, isLoading, error, onS
   const visibleStartups = useMemo(() => {
     const normalizedQuery = normalizeSearchText(query);
     return startups.filter((startup) => {
-      const matchesQuery = !normalizedQuery || normalizeSearchText(startup.name ?? "Startup chưa đặt tên").includes(normalizedQuery);
+      const matchesQuery = !normalizedQuery || normalizeSearchText(startup.name ?? "Unnamed startup").includes(normalizedQuery);
       const matchesFilter = filter === "all" || (filter === "completed" ? startup.current_stage === "completed" : startup.current_stage !== "completed");
       return matchesQuery && matchesFilter;
     });
@@ -214,28 +214,28 @@ export function StartupList({ startups, selectedStartupId, isLoading, error, onS
 
   if (isLoading) return <Skeleton lines={3} compact />;
   if (error) return <p className="form-error">{error.message}</p>;
-  if (startups.length === 0) return <div className="sidebar-empty"><strong>Chưa có startup</strong><p>Tạo startup đầu tiên để bắt đầu.</p></div>;
-  return <section className="startup-directory" aria-label="Quản lý danh sách startup">
+  if (startups.length === 0) return <div className="sidebar-empty"><strong>No startups yet</strong><p>Create your first startup to begin.</p></div>;
+  return <section className="startup-directory" aria-label="Manage startup list">
     <div className="startup-list-toolbar">
       <label className="startup-search">
-        <span className="sr-only">Tìm startup</span>
-        <input type="search" aria-label="Tìm startup" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm startup..." />
+        <span className="sr-only">Search startups</span>
+        <input type="search" aria-label="Search startups" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search startups..." />
       </label>
-      <div className="startup-filters" role="group" aria-label="Lọc startup">
-        <FilterButton label="Tất cả" value="all" current={filter} onSelect={setFilter} />
-        <FilterButton label="Đang làm" value="active" current={filter} onSelect={setFilter} />
-        <FilterButton label="Hoàn thành" value="completed" current={filter} onSelect={setFilter} />
+      <div className="startup-filters" role="group" aria-label="Filter startups">
+        <FilterButton label="All" value="all" current={filter} onSelect={setFilter} />
+        <FilterButton label="Active" value="active" current={filter} onSelect={setFilter} />
+        <FilterButton label="Completed" value="completed" current={filter} onSelect={setFilter} />
       </div>
       <p className="startup-result-count" aria-live="polite">{visibleStartups.length}/{startups.length} startup</p>
     </div>
-    <div className="startup-list-scroll" ref={scrollContainerRef} tabIndex={0} aria-label="Danh sách startup có thể cuộn">
+    <div className="startup-list-scroll" ref={scrollContainerRef} tabIndex={0} aria-label="Scrollable startup list">
       {visibleStartups.length === 0 ? (
-        <div className="sidebar-empty filtered-empty"><strong>Không tìm thấy startup phù hợp</strong><p>Thử từ khóa khác hoặc đổi bộ lọc.</p></div>
+        <div className="sidebar-empty filtered-empty"><strong>No matching startups</strong><p>Try another search term or filter.</p></div>
       ) : (
         <div className="startup-list">{visibleStartups.map((startup) => {
           const progress = stageProgress(startup.current_stage);
           return <button type="button" data-startup-id={startup.id} className={startup.id === selectedStartupId ? "startup-list-item selected" : "startup-list-item"} onClick={() => onSelect(startup.id)} key={startup.id} aria-current={startup.id === selectedStartupId ? "true" : undefined}>
-            <span className="startup-item-copy"><strong>{startup.name ?? "Startup chưa đặt tên"}</strong><small>{STAGE_LABELS[startup.current_stage]} · {progress}/8 giai đoạn</small><small>{formatUpdatedAt(startup.updated_at)}</small></span><span aria-hidden="true">›</span>
+            <span className="startup-item-copy"><strong>{startup.name ?? "Unnamed startup"}</strong><small>{STAGE_LABELS[startup.current_stage]} · {progress}/8 stages</small><small>{formatUpdatedAt(startup.updated_at)}</small></span><span aria-hidden="true">›</span>
           </button>;
         })}</div>
       )}
@@ -278,21 +278,21 @@ export function StartupNameControl({ name, isRenaming, onRename }: { name: strin
 
   if (isEditing) {
     return <form className="startup-name-edit" onSubmit={(event) => { event.preventDefault(); if (draft.trim()) { onRename(draft.trim()); setIsEditing(false); } }}>
-      <label className="sr-only" htmlFor="startup-name">Tên startup</label><input id="startup-name" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={255} autoFocus />
-      <button type="submit" className="secondary-button compact-button" disabled={!draft.trim() || isRenaming}>Lưu</button><button type="button" className="text-button muted" onClick={() => { setDraft(name); setIsEditing(false); }}>Hủy</button>
+      <label className="sr-only" htmlFor="startup-name">Startup name</label><input id="startup-name" value={draft} onChange={(event) => setDraft(event.target.value)} maxLength={255} autoFocus />
+      <button type="submit" className="secondary-button compact-button" disabled={!draft.trim() || isRenaming}>Save</button><button type="button" className="text-button muted" onClick={() => { setDraft(name); setIsEditing(false); }}>Cancel</button>
     </form>;
   }
 
   return <div className="startup-name-control" ref={controlRef}>
-    <h1 ref={titleRef} tabIndex={0} title="Nhấp chuột phải để đổi tên" aria-haspopup="menu" aria-expanded={Boolean(menuPosition)} onContextMenu={(event) => { event.preventDefault(); openMenu(event.clientX, event.clientY); }} onKeyDown={(event) => {
+    <h1 ref={titleRef} tabIndex={0} title="Right-click to rename" aria-haspopup="menu" aria-expanded={Boolean(menuPosition)} onContextMenu={(event) => { event.preventDefault(); openMenu(event.clientX, event.clientY); }} onKeyDown={(event) => {
       if (event.key === "ContextMenu" || (event.shiftKey && event.key === "F10")) {
         event.preventDefault();
         const bounds = titleRef.current?.getBoundingClientRect();
         openMenu(bounds?.left ?? 8, bounds?.bottom ?? 8);
       }
     }}>{name}</h1>
-    {menuPosition ? <div className="startup-context-menu" role="menu" aria-label={`Tùy chọn cho ${name}`} style={{ left: menuPosition.x, top: menuPosition.y }}>
-      <button type="button" role="menuitem" autoFocus onClick={() => { setMenuPosition(null); setIsEditing(true); }}>Đổi tên startup</button>
+    {menuPosition ? <div className="startup-context-menu" role="menu" aria-label={`Options for ${name}`} style={{ left: menuPosition.x, top: menuPosition.y }}>
+      <button type="button" role="menuitem" autoFocus onClick={() => { setMenuPosition(null); setIsEditing(true); }}>Rename startup</button>
     </div> : null}
   </div>;
 }
@@ -316,9 +316,9 @@ function StartupWorkspace({ startup, isAdvancing, isSettingStage, isRenaming, mu
   return <>
     <section className="workspace-header">
       <div>
-        <p className="eyebrow">Startup đang làm việc</p>
-        <StartupNameControl name={startup.name ?? "Startup chưa đặt tên"} isRenaming={isRenaming} onRename={onRename} />
-        <p>Giai đoạn {stageProgress(startup.current_stage)}/8 · {STAGE_LABELS[startup.current_stage]}</p>
+        <p className="eyebrow">Current startup</p>
+        <StartupNameControl name={startup.name ?? "Unnamed startup"} isRenaming={isRenaming} onRename={onRename} />
+        <p>Stage {stageProgress(startup.current_stage)}/8 · {STAGE_LABELS[startup.current_stage]}</p>
       </div>
     </section>
 
@@ -326,39 +326,39 @@ function StartupWorkspace({ startup, isAdvancing, isSettingStage, isRenaming, mu
 
     <StartupOverview startupId={startup.id} currentStage={startup.current_stage} onContinue={() => updateWorkspace(startup.id, { activeView: "chat" })} />
 
-    <div className="content-switcher" role="tablist" aria-label="Nội dung làm việc">
+    <div className="content-switcher" role="tablist" aria-label="Workspace content">
       <button type="button" role="tab" aria-selected={activeView === "chat"} className={activeView === "chat" ? "selected" : ""} onClick={() => updateWorkspace(startup.id, { activeView: "chat" })}>AI Coach</button>
-      <button type="button" role="tab" aria-selected={activeView === "documents"} className={activeView === "documents" ? "selected" : ""} onClick={() => updateWorkspace(startup.id, { activeView: "documents" })}>Tài liệu</button>
+      <button type="button" role="tab" aria-selected={activeView === "documents"} className={activeView === "documents" ? "selected" : ""} onClick={() => updateWorkspace(startup.id, { activeView: "documents" })}>Documents</button>
     </div>
 
     {mutationError ? <p className="form-error panel-error">{mutationError.message}</p> : null}
     <div role="tabpanel">
       {activeView === "chat" ? <ChatPanel startupId={startup.id} currentStage={startup.current_stage} isAdvancing={isAdvancing} onAdvanceStage={onAdvanceStage} currentDocumentLabel={currentStageDocType ? DOCUMENT_LABELS[currentStageDocType] : null} onOpenCurrentDocument={currentStageDocType ? openCurrentDocument : undefined} /> : null}
       {activeView === "documents" && selectedDocument === "startup_report" ? <StartupReportWorkspace startupId={startup.id} onBack={() => updateWorkspace(startup.id, { selectedDocument: currentStageDocType ?? "lean_canvas" })} /> : null}
-      {activeView === "documents" && selectedDocument !== "startup_report" ? <DocumentWorkspace startupId={startup.id} startupName={startup.name ?? "Startup chưa đặt tên"} selectedDocType={selectedDocType} onSelectDocType={(docType) => updateWorkspace(startup.id, { selectedDocument: docType })} onOpenReport={() => updateWorkspace(startup.id, { selectedDocument: "startup_report" })} /> : null}
+      {activeView === "documents" && selectedDocument !== "startup_report" ? <DocumentWorkspace startupId={startup.id} startupName={startup.name ?? "Unnamed startup"} selectedDocType={selectedDocType} onSelectDocType={(docType) => updateWorkspace(startup.id, { selectedDocument: docType })} onOpenReport={() => updateWorkspace(startup.id, { selectedDocument: "startup_report" })} /> : null}
     </div>
   </>;
 }
 
 function confirmationCopy(action: PendingAction, startup: Startup | null) {
-  if (action?.kind === "set-stage") return { title: `Quay lại ${STAGE_LABELS[action.stage]}?`, description: "Các tài liệu đã tạo sẽ được giữ nguyên.", confirmLabel: "Quay lại giai đoạn" };
+  if (action?.kind === "set-stage") return { title: `Return to ${STAGE_LABELS[action.stage]}?`, description: "Your generated documents will be preserved.", confirmLabel: "Return to stage" };
   const next = startup ? nextStageLabel(startup.current_stage) : null;
-  return { title: next ? `Chuyển sang ${next}?` : "Chuyển giai đoạn?", description: "Hãy chắc chắn bạn đã cung cấp đủ thông tin cho giai đoạn hiện tại.", confirmLabel: "Tiếp tục" };
+  return { title: next ? `Move to ${next}?` : "Change stage?", description: "Make sure you have provided enough information for the current stage.", confirmLabel: "Continue" };
 }
 
 function stageProgress(stage: StageName): number { return stage === "completed" ? 8 : STAGES.indexOf(stage) + 1; }
 
 function formatUpdatedAt(value: string | null): string {
-  if (!value) return "Chưa có thời gian cập nhật";
+  if (!value) return "No update time";
   const deltaMinutes = Math.max(0, Math.round((Date.now() - new Date(value).getTime()) / 60_000));
-  if (deltaMinutes < 1) return "Vừa cập nhật";
-  if (deltaMinutes < 60) return `Cập nhật ${deltaMinutes} phút trước`;
-  if (deltaMinutes < 1_440) return `Cập nhật ${Math.floor(deltaMinutes / 60)} giờ trước`;
-  return new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium" }).format(new Date(value));
+  if (deltaMinutes < 1) return "Updated just now";
+  if (deltaMinutes < 60) return `Updated ${deltaMinutes} minutes ago`;
+  if (deltaMinutes < 1_440) return `Updated ${Math.floor(deltaMinutes / 60)} hours ago`;
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(new Date(value));
 }
 
 function normalizeSearchText(value: string): string {
-  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("vi-VN").trim();
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("en-US").trim();
 }
 
 export function sortStartupsByRecent(startups: Startup[]): Startup[] {

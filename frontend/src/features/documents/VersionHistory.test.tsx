@@ -28,15 +28,15 @@ describe("VersionHistory", () => {
       />
     );
 
-    expect(screen.getByRole("heading", { name: "Lịch sử phiên bản" })).toBeInTheDocument();
-    expect(screen.getByText("Phiên bản 2 · hiện tại")).toBeInTheDocument();
-    expect(screen.getByText("Phiên bản 1")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Version history" })).toBeInTheDocument();
+    expect(screen.getByText("Version 2 · current")).toBeInTheDocument();
+    expect(screen.getByText("Version 1")).toBeInTheDocument();
   });
 
   it("renders an empty state when no versions exist", () => {
     render(<VersionHistory documents={[]} isLoading={false} error={null} />);
 
-    expect(screen.getByText("Chưa có phiên bản trước.")).toBeInTheDocument();
+    expect(screen.getByText("No previous versions.")).toBeInTheDocument();
   });
 
   it("lets the user preview, compare, and restore an older version", async () => {
@@ -56,9 +56,9 @@ describe("VersionHistory", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "Xem phiên bản 1" }));
-    await user.click(screen.getByRole("button", { name: "So sánh phiên bản 1" }));
-    await user.click(screen.getByRole("button", { name: "Khôi phục phiên bản 1" }));
+    await user.click(screen.getByRole("button", { name: "Preview version 1" }));
+    await user.click(screen.getByRole("button", { name: "Compare version 1" }));
+    await user.click(screen.getByRole("button", { name: "Restore version 1" }));
 
     expect(onPreview).toHaveBeenCalledWith(oldDocument);
     expect(onCompare).toHaveBeenCalledWith(oldDocument);

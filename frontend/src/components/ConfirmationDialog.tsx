@@ -15,7 +15,7 @@ export function ConfirmationDialog({
   title,
   description,
   confirmLabel,
-  cancelLabel = "Hủy",
+  cancelLabel = "Cancel",
   onConfirm,
   onCancel
 }: ConfirmationDialogProps) {

@@ -73,6 +73,26 @@ async def test_document_service_creates_new_current_version_without_losing_histo
     assert current["version"] == 2
     assert current["content"]["problem"] == "Lesson coordination is scattered."
     assert [entry["version"] for entry in history] == [2, 1]
+
+
+async def test_document_service_persists_long_funding_recommendation(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    startup_id = await _create_startup(session_factory)
+    recommendation = "Bootstrap validation first, then consider grants, competitions, accelerators, or pre-seed funding after demonstrating repeat usage and vendor willingness to pay."
+
+    async with session_factory() as session:
+        document = await DocumentService(session).save_document(
+            startup_id=startup_id,
+            doc_type="funding_guide",
+            data={
+                "pitch_outline": [{"slide_title": "The ask", "content": "Validate the MVP."}],
+                "valuation_notes": "Use educational ranges only and consult an advisor before discussing terms.",
+                "funding_stage_recommendation": recommendation,
+            },
+        )
+
+    assert document["content"]["funding_stage_recommendation"] == recommendation
     assert [entry["is_current"] for entry in history] == [True, False]
 
 

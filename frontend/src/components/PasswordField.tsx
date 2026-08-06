@@ -21,30 +21,30 @@ export function PasswordField({ value, onChange, autoComplete, showStrength = fa
           onChange={(event) => onChange(event.target.value)}
           required
           minLength={8}
-          aria-label="Mật khẩu"
+          aria-label="Password"
           aria-describedby={showStrength ? "password-guidance" : undefined}
         />
         <button
           type="button"
           className="password-toggle"
           onClick={() => setIsVisible((current) => !current)}
-          aria-label={isVisible ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+          aria-label={isVisible ? "Hide password" : "Show password"}
           aria-pressed={isVisible}
         >
-          {isVisible ? "Ẩn" : "Hiện"}
+          {isVisible ? "Hide" : "Show"}
         </button>
       </div>
       {showStrength ? (
         <div className="password-guidance" id="password-guidance">
           <div className="password-strength-row">
-            <span>Độ mạnh mật khẩu</span>
+            <span>Password strength</span>
             <strong>{strength.label}</strong>
           </div>
           <div className="password-meter" aria-hidden="true">
             <span style={{ width: `${strength.percent}%` }} data-level={strength.level} />
           </div>
           <p className={value.length >= 8 ? "requirement-met" : undefined}>
-            <span aria-hidden="true">{value.length >= 8 ? "✓" : "○"}</span> Tối thiểu 8 ký tự
+            <span aria-hidden="true">{value.length >= 8 ? "✓" : "○"}</span> At least 8 characters
           </p>
         </div>
       ) : null}
@@ -54,15 +54,15 @@ export function PasswordField({ value, onChange, autoComplete, showStrength = fa
 
 function passwordStrength(value: string) {
   if (!value) {
-    return { label: "Chưa nhập", percent: 0, level: "empty" };
+    return { label: "Empty", percent: 0, level: "empty" };
   }
   let score = value.length >= 8 ? 1 : 0;
   score += /[a-z]/.test(value) && /[A-Z]/.test(value) ? 1 : 0;
   score += /\d/.test(value) ? 1 : 0;
   score += /[^A-Za-z0-9]/.test(value) || value.length >= 12 ? 1 : 0;
 
-  if (score <= 1) return { label: "Yếu", percent: 25, level: "weak" };
-  if (score === 2) return { label: "Trung bình", percent: 55, level: "medium" };
-  if (score === 3) return { label: "Tốt", percent: 78, level: "good" };
-  return { label: "Mạnh", percent: 100, level: "strong" };
+  if (score <= 1) return { label: "Weak", percent: 25, level: "weak" };
+  if (score === 2) return { label: "Medium", percent: 55, level: "medium" };
+  if (score === 3) return { label: "Good", percent: 78, level: "good" };
+  return { label: "Strong", percent: 100, level: "strong" };
 }

@@ -22,17 +22,17 @@ export function SignupPage() {
     clearError();
     try {
       await signup(name, email, password);
-      showToast("Tạo tài khoản thành công. Hãy bắt đầu với ý tưởng đầu tiên!", "success");
+      showToast("Account created successfully. Start with your first idea!", "success");
     } catch {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <AuthPage title="Tạo tài khoản" subtitle="Bắt đầu hành trình có hướng dẫn từ ý tưởng đến kế hoạch gọi vốn.">
+    <AuthPage title="Create an account" subtitle="Start a guided journey from idea to fundraising plan.">
       <form className="auth-form" onSubmit={onSubmit}>
         <label>
-          Họ và tên
+          Full name
           <input
             type="text"
             autoComplete="name"
@@ -52,12 +52,12 @@ export function SignupPage() {
           />
         </label>
         <label>
-          Mật khẩu
+          Password
           <PasswordField value={password} onChange={setPassword} autoComplete="new-password" showStrength />
         </label>
         {error ? <p className="form-error">{error}</p> : null}
         <button type="submit" className="primary-button" disabled={isSubmitting}>
-          {isSubmitting ? "Đang tạo tài khoản..." : "Tạo tài khoản"}
+          {isSubmitting ? "Creating account..." : "Create account"}
         </button>
       </form>
       <AuthSwitchLink mode="signup" />

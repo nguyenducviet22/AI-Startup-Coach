@@ -11,27 +11,27 @@ type FieldCard = {
 };
 
 const LEAN_CANVAS_FIELDS: FieldCard[] = [
-  { key: "problem", label: "Vấn đề" },
-  { key: "customer_segments", label: "Phân khúc khách hàng" },
-  { key: "unique_value_proposition", label: "Giá trị khác biệt" },
-  { key: "solution", label: "Giải pháp" },
-  { key: "channels", label: "Kênh tiếp cận" },
-  { key: "revenue_streams", label: "Dòng doanh thu" },
-  { key: "cost_structure", label: "Cơ cấu chi phí" },
-  { key: "key_metrics", label: "Chỉ số chính" },
-  { key: "unfair_advantage", label: "Lợi thế khó sao chép" }
+  { key: "problem", label: "Problem" },
+  { key: "customer_segments", label: "Customer segments" },
+  { key: "unique_value_proposition", label: "Unique value proposition" },
+  { key: "solution", label: "Solution" },
+  { key: "channels", label: "Channels" },
+  { key: "revenue_streams", label: "Revenue streams" },
+  { key: "cost_structure", label: "Cost structure" },
+  { key: "key_metrics", label: "Key metrics" },
+  { key: "unfair_advantage", label: "Unfair advantage" }
 ];
 
 const BMC_FIELDS: FieldCard[] = [
-  { key: "key_partners", label: "Đối tác chính" },
-  { key: "key_activities", label: "Hoạt động chính" },
-  { key: "key_resources", label: "Nguồn lực chính" },
-  { key: "value_propositions", label: "Giá trị cung cấp" },
-  { key: "customer_relationships", label: "Quan hệ khách hàng" },
-  { key: "channels", label: "Kênh phân phối" },
-  { key: "customer_segments", label: "Phân khúc khách hàng" },
-  { key: "cost_structure", label: "Cơ cấu chi phí" },
-  { key: "revenue_streams", label: "Dòng doanh thu" }
+  { key: "key_partners", label: "Key partners" },
+  { key: "key_activities", label: "Key activities" },
+  { key: "key_resources", label: "Key resources" },
+  { key: "value_propositions", label: "Value propositions" },
+  { key: "customer_relationships", label: "Customer relationships" },
+  { key: "channels", label: "Channels" },
+  { key: "customer_segments", label: "Customer segments" },
+  { key: "cost_structure", label: "Cost structure" },
+  { key: "revenue_streams", label: "Revenue streams" }
 ];
 
 export function DocumentLayout({ docType, document }: DocumentLayoutProps) {
@@ -55,7 +55,7 @@ export function DocumentLayout({ docType, document }: DocumentLayoutProps) {
 
 export function LeanCanvasLayout({ content }: { content: Record<string, unknown> }) {
   return (
-    <div className="lean-canvas-grid" aria-label="Các khối Lean Canvas">
+    <div className="lean-canvas-grid" aria-label="Lean Canvas blocks">
       {LEAN_CANVAS_FIELDS.map((field) => (
         <DocumentBlock label={field.label} value={textValue(content[field.key])} key={field.key} />
       ))}
@@ -65,7 +65,7 @@ export function LeanCanvasLayout({ content }: { content: Record<string, unknown>
 
 export function BmcLayout({ content }: { content: Record<string, unknown> }) {
   return (
-    <div className="bmc-grid" aria-label="Các khối Business Model Canvas">
+    <div className="bmc-grid" aria-label="Business Model Canvas blocks">
       {BMC_FIELDS.map((field) => (
         <DocumentBlock label={field.label} value={textValue(content[field.key])} key={field.key} />
       ))}
@@ -75,14 +75,14 @@ export function BmcLayout({ content }: { content: Record<string, unknown> }) {
 
 export function SwotLayout({ content }: { content: Record<string, unknown> }) {
   const groups = [
-    { key: "strengths", label: "Điểm mạnh" },
-    { key: "weaknesses", label: "Điểm yếu" },
-    { key: "opportunities", label: "Cơ hội" },
-    { key: "threats", label: "Thách thức" }
+    { key: "strengths", label: "Strengths" },
+    { key: "weaknesses", label: "Weaknesses" },
+    { key: "opportunities", label: "Opportunities" },
+    { key: "threats", label: "Threats" }
   ];
 
   return (
-    <div className="swot-grid" aria-label="Các nhóm SWOT">
+    <div className="swot-grid" aria-label="SWOT groups">
       {groups.map((group) => (
         <section className="document-block swot-group" key={group.key}>
           <h4>{group.label}</h4>
@@ -99,15 +99,15 @@ export function ProductPlanLayout({ content }: { content: Record<string, unknown
 
   return (
     <div className="document-stack">
-      <DocumentBlock label="Phạm vi MVP" value={textValue(content.mvp_scope)} />
+      <DocumentBlock label="MVP scope" value={textValue(content.mvp_scope)} />
 
       <section className="document-block">
-        <h4>Tính năng ưu tiên</h4>
-        <div className="feature-table" role="table" aria-label="Danh sách tính năng ưu tiên">
+        <h4>Prioritized features</h4>
+        <div className="feature-table" role="table" aria-label="Prioritized feature list">
           <div className="feature-row feature-row-heading" role="row">
-            <span role="columnheader">Tính năng</span>
-            <span role="columnheader">Ưu tiên</span>
-            <span role="columnheader">Nguồn lực</span>
+            <span role="columnheader">Feature</span>
+            <span role="columnheader">Priority</span>
+            <span role="columnheader">Effort</span>
           </div>
           {features.length > 0 ? (
             features.map((feature, index) => (
@@ -118,13 +118,13 @@ export function ProductPlanLayout({ content }: { content: Record<string, unknown
               </div>
             ))
           ) : (
-            <p className="document-muted">Chưa có tính năng được ưu tiên.</p>
+            <p className="document-muted">No prioritized features yet.</p>
           )}
         </div>
       </section>
 
       <section className="document-block">
-        <h4>Lộ trình cột mốc</h4>
+        <h4>Milestone roadmap</h4>
         {timeline.length > 0 ? (
           <ol className="timeline-list">
             {timeline.map((item, index) => (
@@ -135,7 +135,7 @@ export function ProductPlanLayout({ content }: { content: Record<string, unknown
             ))}
           </ol>
         ) : (
-          <p className="document-muted">Chưa có cột mốc.</p>
+          <p className="document-muted">No milestones yet.</p>
         )}
       </section>
     </div>
@@ -145,13 +145,13 @@ export function ProductPlanLayout({ content }: { content: Record<string, unknown
 export function MarketingLayout({ content }: { content: Record<string, unknown> }) {
   return (
     <div className="document-stack">
-      <DocumentBlock label="Khách hàng mục tiêu" value={textValue(content.target_audience)} />
+      <DocumentBlock label="Target audience" value={textValue(content.target_audience)} />
       <section className="document-block">
-        <h4>Kênh tiếp cận</h4>
+        <h4>Channels</h4>
         <DocumentList values={stringList(content.channels)} />
       </section>
-      <DocumentBlock label="Thông điệp chính" value={textValue(content.key_messages)} />
-      <DocumentBlock label="Ngân sách dự kiến" value={textValue(content.budget_estimate)} />
+      <DocumentBlock label="Key messages" value={textValue(content.key_messages)} />
+      <DocumentBlock label="Estimated budget" value={textValue(content.budget_estimate)} />
     </div>
   );
 }
@@ -162,7 +162,7 @@ export function FundingLayout({ content }: { content: Record<string, unknown> })
   return (
     <div className="document-stack">
       <section className="document-block">
-        <h4>Dàn ý gọi vốn</h4>
+        <h4>Pitch outline</h4>
         {slides.length > 0 ? (
           <ol className="pitch-list">
             {slides.map((slide, index) => (
@@ -173,12 +173,12 @@ export function FundingLayout({ content }: { content: Record<string, unknown> })
             ))}
           </ol>
         ) : (
-          <p className="document-muted">Chưa có dàn ý gọi vốn.</p>
+          <p className="document-muted">No pitch outline yet.</p>
         )}
       </section>
-      <DocumentBlock label="Ghi chú định giá" value={textValue(content.valuation_notes)} />
+      <DocumentBlock label="Valuation notes" value={textValue(content.valuation_notes)} />
       <DocumentBlock
-        label="Đề xuất giai đoạn gọi vốn"
+        label="Recommended funding stage"
         value={textValue(content.funding_stage_recommendation)}
       />
     </div>
@@ -189,14 +189,14 @@ function DocumentBlock({ label, value }: { label: string; value: string }) {
   return (
     <section className="document-block">
       <h4>{label}</h4>
-      <p>{value || "Chưa có thông tin."}</p>
+      <p>{value || "No information yet."}</p>
     </section>
   );
 }
 
 function DocumentList({ values }: { values: string[] }) {
   if (values.length === 0) {
-    return <p className="document-muted">Chưa có thông tin.</p>;
+    return <p className="document-muted">No information yet.</p>;
   }
 
   return (
