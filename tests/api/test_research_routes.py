@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 import httpx
 import pytest
 from sqlalchemy import select, text
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
 import app.db.base  # noqa: F401
@@ -22,7 +22,12 @@ from app.models.research import ResearchCall
 from app.models.startup import Startup
 from app.models.user import User
 from app.research.errors import ResearchProviderError
-from app.research.schemas import EvidenceAuthority, EvidenceRecord, ProviderExtractResponse, ProviderSearchResponse
+from app.research.schemas import (
+    EvidenceAuthority,
+    EvidenceRecord,
+    ProviderExtractResponse,
+    ProviderSearchResponse,
+)
 
 
 class FakeResearchProvider:
@@ -44,13 +49,32 @@ class FakeResearchProvider:
         if self.failure:
             raise self.failure
         now = datetime.now(UTC)
-        return response_type(evidence=[EvidenceRecord(source_id="source-1", url="https://example.com/source", title="Source", excerpt="Evidence", retrieved_at=now, authority=EvidenceAuthority.OFFICIAL if self.legal else EvidenceAuthority.UNKNOWN, legal_or_regulatory=self.legal)], request_id="fake-request", credits_used=1, retrieved_at=now)
+        return response_type(
+            evidence=[
+                EvidenceRecord(
+                    source_id="source-1",
+                    url="https://example.com/source",
+                    title="Source",
+                    excerpt="Evidence",
+                    retrieved_at=now,
+                    authority=EvidenceAuthority.OFFICIAL
+                    if self.legal
+                    else EvidenceAuthority.UNKNOWN,
+                    legal_or_regulatory=self.legal,
+                )
+            ],
+            request_id="fake-request",
+            credits_used=1,
+            retrieved_at=now,
+        )
 
 
 @pytest.fixture(scope="module")
 def postgres_url() -> AsyncIterator[str]:
     with PostgresContainer("postgres:16-alpine") as postgres:
-        yield postgres.get_connection_url().replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+        yield postgres.get_connection_url().replace(
+            "postgresql+psycopg2://", "postgresql+asyncpg://", 1
+        )
 
 
 @pytest.fixture()
@@ -67,10 +91,16 @@ async def session_factory(postgres_url: str):
 @pytest.fixture()
 async def client(session_factory, postgres_url, monkeypatch):
     provider = FakeResearchProvider()
+
     async def override_session():
-        async with session_factory() as session: yield session
+        async with session_factory() as session:
+            yield session
+
     monkeypatch.setenv("DATABASE_URL", postgres_url)
-    get_settings.cache_clear(); db_session._engine = None; db_session._session_local = None
+    monkeypatch.setenv("JWT_SECRET", "research-route-test-secret-with-at-least-thirty-two-bytes")
+    get_settings.cache_clear()
+    db_session._engine = None
+    db_session._session_local = None
     app.dependency_overrides[get_db_session] = override_session
     app.dependency_overrides[get_research_provider] = lambda: provider
     app.dependency_overrides[get_chat_research_provider] = lambda: provider
@@ -79,41 +109,89 @@ async def client(session_factory, postgres_url, monkeypatch):
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as http_client:
         http_client.provider = provider
         yield http_client
-    app.dependency_overrides.clear(); db_session._engine = None; db_session._session_local = None; get_settings.cache_clear()
+    app.dependency_overrides.clear()
+    db_session._engine = None
+    db_session._session_local = None
+    get_settings.cache_clear()
 
 
 async def _user(factory):
     async with factory() as s:
-        user = User(name="u", email=f"{uuid.uuid4()}@example.com"); s.add(user); await s.commit(); return user.id
+        user = User(name="u", email=f"{uuid.uuid4()}@example.com")
+        s.add(user)
+        await s.commit()
+        return user.id
+
 
 async def _startup(factory, user_id):
     async with factory() as s:
-        startup = Startup(user_id=user_id, name="s"); s.add(startup); await s.commit(); return startup.id
+        startup = Startup(user_id=user_id, name="s")
+        s.add(startup)
+        await s.commit()
+        return startup.id
 
-def _headers(user_id): return {"Authorization": f"Bearer {create_access_token(user_id, settings=_settings())}"}
-def _settings(): return Settings(_env_file=None, DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/coaching", TAVILY_API_KEY="test", JWT_SECRET="research-route-test-secret-with-at-least-thirty-two-bytes", LLM_BASE_URL="http://localhost:20128/v1", LLM_MODEL="m", LLM_API_KEY="k")
-async def _research(client, startup_id, user_id, body): return await client.post(f"/startups/{startup_id}/research", json=body, headers=_headers(user_id))
+
+def _headers(user_id):
+    return {"Authorization": f"Bearer {create_access_token(user_id, settings=_settings())}"}
+
+
+def _settings():
+    return Settings(
+        _env_file=None,
+        DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/coaching",
+        TAVILY_API_KEY="test",
+        JWT_SECRET="research-route-test-secret-with-at-least-thirty-two-bytes",
+        LLM_BASE_URL="http://localhost:20128/v1",
+        LLM_MODEL="m",
+        LLM_API_KEY="k",
+    )
+
+
+async def _research(client, startup_id, user_id, body):
+    return await client.post(
+        f"/startups/{startup_id}/research", json=body, headers=_headers(user_id)
+    )
+
 
 async def test_research_route_returns_404_for_non_owner(client, session_factory):
-    owner, other = await _user(session_factory), await _user(session_factory); startup = await _startup(session_factory, owner)
-    assert (await _research(client, startup, other, {"query":"market"})).status_code == 404
+    owner, other = await _user(session_factory), await _user(session_factory)
+    startup = await _startup(session_factory, owner)
+    assert (await _research(client, startup, other, {"query": "market"})).status_code == 404
 
-async def test_research_route_reuses_or_creates_chat_session_for_correlation(client, session_factory):
-    user = await _user(session_factory); startup = await _startup(session_factory, user)
-    response = await _research(client, startup, user, {"query":"market"}); assert response.status_code == 200
-    async with session_factory() as s: session = (await s.execute(select(ChatSession).where(ChatSession.startup_id == startup))).scalar_one()
-    assert (await _research(client, startup, user, {"query":"other", "session_id": str(session.id)})).status_code == 200
+
+async def test_research_route_reuses_or_creates_chat_session_for_correlation(
+    client, session_factory
+):
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    response = await _research(client, startup, user, {"query": "market"})
+    assert response.status_code == 200
+    async with session_factory() as s:
+        session = (
+            await s.execute(select(ChatSession).where(ChatSession.startup_id == startup))
+        ).scalar_one()
+    assert (
+        await _research(client, startup, user, {"query": "other", "session_id": str(session.id)})
+    ).status_code == 200
+
 
 async def test_research_route_handles_direct_query_request(client, session_factory):
-    user = await _user(session_factory); startup = await _startup(session_factory, user); response = await _research(client, startup, user, {"query":"market"})
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    response = await _research(client, startup, user, {"query": "market"})
     assert response.status_code == 200 and client.provider.search_calls == 1
 
+
 async def test_research_route_handles_direct_url_extraction_request(client, session_factory):
-    user = await _user(session_factory); startup = await _startup(session_factory, user); response = await _research(client, startup, user, {"urls":["https://example.com"]})
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    response = await _research(client, startup, user, {"urls": ["https://example.com"]})
     assert response.status_code == 200 and client.provider.extract_calls == 1
 
+
 async def test_research_route_rejects_malformed_url_with_structured_error(client, session_factory):
-    user = await _user(session_factory); startup = await _startup(session_factory, user)
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
     response = await _research(client, startup, user, {"urls": ["not-a-url"]})
     assert response.status_code == 422
     assert response.json()["detail"] == {
@@ -122,49 +200,124 @@ async def test_research_route_rejects_malformed_url_with_structured_error(client
         "message": "Input should be a valid URL, relative URL without a base",
     }
 
-async def test_research_route_includes_legal_notice_when_evidence_is_legal_or_regulatory(client, session_factory):
-    client.provider.legal = True; user = await _user(session_factory); startup = await _startup(session_factory, user); response = await _research(client, startup, user, {"query":"law", "category":"legal", "jurisdiction":"Vietnam"})
+
+async def test_research_route_includes_legal_notice_when_evidence_is_legal_or_regulatory(
+    client, session_factory
+):
+    client.provider.legal = True
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    response = await _research(
+        client, startup, user, {"query": "law", "category": "legal", "jurisdiction": "Vietnam"}
+    )
     assert response.status_code == 200 and response.json()["legal_notice"]
 
-async def test_research_route_second_identical_request_is_a_cache_hit_and_skips_provider_call(client, session_factory):
-    user = await _user(session_factory); startup = await _startup(session_factory, user); await _research(client, startup, user, {"query":"market"}); response = await _research(client, startup, user, {"query":"market"})
+
+async def test_research_route_second_identical_request_is_a_cache_hit_and_skips_provider_call(
+    client, session_factory
+):
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    await _research(client, startup, user, {"query": "market"})
+    response = await _research(client, startup, user, {"query": "market"})
     assert response.json()["cache_hit"] is True and client.provider.search_calls == 1
 
-async def test_research_route_maps_rate_limit_to_429_with_structured_detail(client, session_factory, monkeypatch):
+
+async def test_research_route_maps_rate_limit_to_429_with_structured_detail(
+    client, session_factory, monkeypatch
+):
     from app.services.research_quota_service import ResearchQuotaService
+
     async def limited(self, **kwargs):
         from app.services.research_errors import ResearchErrorDetail, ResearchServiceError
-        raise ResearchServiceError(ResearchErrorDetail("research", "research_rate_limited", "Limited"))
-    monkeypatch.setattr(ResearchQuotaService, "reserve", limited); user = await _user(session_factory); startup = await _startup(session_factory, user); response = await _research(client, startup, user, {"query":"market"})
-    assert response.status_code == 429 and response.json()["detail"]["code"] == "research_rate_limited"
 
-async def test_research_route_maps_provider_failure_to_structured_error_not_raw_exception(client, session_factory):
-    client.provider.failure = ResearchProviderError("provider_timeout"); user = await _user(session_factory); startup = await _startup(session_factory, user); response = await _research(client, startup, user, {"query":"market"})
+        raise ResearchServiceError(
+            ResearchErrorDetail("research", "research_rate_limited", "Limited")
+        )
+
+    monkeypatch.setattr(ResearchQuotaService, "reserve", limited)
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    response = await _research(client, startup, user, {"query": "market"})
+    assert (
+        response.status_code == 429 and response.json()["detail"]["code"] == "research_rate_limited"
+    )
+
+
+async def test_research_route_maps_provider_failure_to_structured_error_not_raw_exception(
+    client, session_factory
+):
+    client.provider.failure = ResearchProviderError("provider_timeout")
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    response = await _research(client, startup, user, {"query": "market"})
     assert response.status_code == 503 and response.json()["detail"]["code"] == "provider_timeout"
 
-async def test_research_route_does_not_mutate_stage_or_document_state(client, session_factory):
-    user = await _user(session_factory); startup = await _startup(session_factory, user); await _research(client, startup, user, {"query":"market"})
-    async with session_factory() as s: assert (await s.get(Startup, startup)).current_stage == "idea"
 
-async def test_research_route_records_exactly_one_research_call_row_with_null_turn_id(client, session_factory):
-    user = await _user(session_factory); startup = await _startup(session_factory, user); await _research(client, startup, user, {"query":"market"})
-    async with session_factory() as s: calls = (await s.execute(select(ResearchCall).where(ResearchCall.startup_id == startup))).scalars().all()
+async def test_research_route_does_not_mutate_stage_or_document_state(client, session_factory):
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    await _research(client, startup, user, {"query": "market"})
+    async with session_factory() as s:
+        assert (await s.get(Startup, startup)).current_stage == "idea"
+
+
+async def test_research_route_records_exactly_one_research_call_row_with_null_turn_id(
+    client, session_factory
+):
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    await _research(client, startup, user, {"query": "market"})
+    async with session_factory() as s:
+        calls = (
+            (await s.execute(select(ResearchCall).where(ResearchCall.startup_id == startup)))
+            .scalars()
+            .all()
+        )
     assert len(calls) == 1 and calls[0].turn_id is None
+
 
 async def test_chat_route_research_call_still_gets_a_real_turn_id(client, session_factory):
     class Chat:
-        def __init__(self): self.calls = 0
+        def __init__(self):
+            self.calls = 0
+
         async def create_chat_completion(self, **kwargs):
             self.calls += 1
             if self.calls == 1:
-                return {"choices":[{"message":{"content":None,"tool_calls":[{"id":"research","function":{"name":"research_web","arguments":"{\"query\": \"market\"}"}}]}}]}
-            return {"choices":[{"message":{"content":"Evidence [source-1].","tool_calls":[]}}]}
+                return {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": "research",
+                                        "function": {
+                                            "name": "research_web",
+                                            "arguments": '{"query": "market"}',
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                }
+            return {"choices": [{"message": {"content": "Evidence [source-1].", "tool_calls": []}}]}
+
     app.dependency_overrides[get_chat_client] = lambda: Chat()
-    user = await _user(session_factory); startup = await _startup(session_factory, user)
-    response = await client.post(f"/startups/{startup}/chat", json={"message":"research"}, headers=_headers(user))
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    response = await client.post(
+        f"/startups/{startup}/chat", json={"message": "research"}, headers=_headers(user)
+    )
     assert response.status_code == 200
     async with session_factory() as s:
-        call = (await s.execute(select(ResearchCall).where(ResearchCall.startup_id == startup))).scalar_one()
-        turn = (await s.execute(select(AgentTurn).where(AgentTurn.startup_id == startup))).scalar_one()
+        call = (
+            await s.execute(select(ResearchCall).where(ResearchCall.startup_id == startup))
+        ).scalar_one()
+        turn = (
+            await s.execute(select(AgentTurn).where(AgentTurn.startup_id == startup))
+        ).scalar_one()
     assert call.turn_id is not None
     assert call.turn_id == turn.id

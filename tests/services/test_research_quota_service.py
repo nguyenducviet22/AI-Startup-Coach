@@ -3,7 +3,7 @@ import uuid
 from collections.abc import AsyncIterator
 
 import pytest
-from sqlalchemy import select, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from testcontainers.community.postgres import PostgresContainer
 
@@ -62,8 +62,12 @@ async def test_concurrent_user_reservations_overlap_and_only_one_consumes_final_
         assert not second.done()
         await held_lock_session.commit()
 
-    outcomes = await asyncio.wait_for(asyncio.gather(first, second, return_exceptions=True), timeout=10)
-    assert len([outcome for outcome in outcomes if isinstance(outcome, ResearchQuotaReservation)]) == 1
+    outcomes = await asyncio.wait_for(
+        asyncio.gather(first, second, return_exceptions=True), timeout=10
+    )
+    assert (
+        len([outcome for outcome in outcomes if isinstance(outcome, ResearchQuotaReservation)]) == 1
+    )
     errors = [outcome for outcome in outcomes if isinstance(outcome, ResearchServiceError)]
     assert len(errors) == 1
     assert errors[0].detail.code == "research_rate_limited"
@@ -77,19 +81,33 @@ async def test_session_limit_releases_failed_provider_reservation(
     user_id, session_id = await _session_owner(session_factory)
     settings = _settings(RESEARCH_SESSION_HOURLY_CALL_LIMIT=1)
     async with session_factory() as held_lock_session:
-        await held_lock_session.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _advisory_key(session_id)})
+        await held_lock_session.execute(
+            text("SELECT pg_advisory_xact_lock(:key)"), {"key": _advisory_key(session_id)}
+        )
         entered = [asyncio.Event(), asyncio.Event()]
+
         async def reserve(index: int):
             async with session_factory() as task_session:
                 entered[index].set()
-                return await ResearchQuotaService(task_session, settings).reserve(user_id=user_id, session_id=session_id, credits=1)
+                return await ResearchQuotaService(task_session, settings).reserve(
+                    user_id=user_id, session_id=session_id, credits=1
+                )
+
         first, second = asyncio.create_task(reserve(0)), asyncio.create_task(reserve(1))
-        await asyncio.wait_for(entered[0].wait(), timeout=5); await asyncio.wait_for(entered[1].wait(), timeout=5)
-        await asyncio.sleep(0.1); assert not first.done() and not second.done()
+        await asyncio.wait_for(entered[0].wait(), timeout=5)
+        await asyncio.wait_for(entered[1].wait(), timeout=5)
+        await asyncio.sleep(0.1)
+        assert not first.done() and not second.done()
         await held_lock_session.commit()
-    outcomes = await asyncio.wait_for(asyncio.gather(first, second, return_exceptions=True), timeout=10)
-    assert len([outcome for outcome in outcomes if isinstance(outcome, ResearchQuotaReservation)]) == 1
-    assert [outcome.detail.scope for outcome in outcomes if isinstance(outcome, ResearchServiceError)] == ["session"]
+    outcomes = await asyncio.wait_for(
+        asyncio.gather(first, second, return_exceptions=True), timeout=10
+    )
+    assert (
+        len([outcome for outcome in outcomes if isinstance(outcome, ResearchQuotaReservation)]) == 1
+    )
+    assert [
+        outcome.detail.scope for outcome in outcomes if isinstance(outcome, ResearchServiceError)
+    ] == ["session"]
 
 
 async def _user_id(session_factory: async_sessionmaker[AsyncSession]) -> uuid.UUID:
@@ -100,14 +118,19 @@ async def _user_id(session_factory: async_sessionmaker[AsyncSession]) -> uuid.UU
         return user.id
 
 
-async def _session_owner(session_factory: async_sessionmaker[AsyncSession]) -> tuple[uuid.UUID, uuid.UUID]:
+async def _session_owner(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> tuple[uuid.UUID, uuid.UUID]:
     async with session_factory() as session:
         user = User(name="Session User", email=f"{uuid.uuid4()}@example.com")
-        session.add(user); await session.flush()
+        session.add(user)
+        await session.flush()
         startup = Startup(user_id=user.id, name="Research startup")
-        session.add(startup); await session.flush()
+        session.add(startup)
+        await session.flush()
         chat = ChatSession(startup_id=startup.id)
-        session.add(chat); await session.commit()
+        session.add(chat)
+        await session.commit()
         return user.id, chat.id
 
 
