@@ -51,6 +51,24 @@ h1, h2, h3, h4 { color: var(--ink); }
 .primary-button:hover:not(:disabled) { border-color: var(--primary-strong); background: var(--primary-strong); }
 .secondary-button { border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
 .secondary-button:hover:not(:disabled) { border-color: var(--primary); background: var(--primary-soft); }
+.research-panel { margin-top: 20px; }
+.research-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.research-form label { display: grid; gap: 7px; color: var(--ink-soft); font-size: 0.84rem; font-weight: 750; }
+.research-form textarea, .research-form input, .research-form select { width: 100%; min-height: 42px; border: 1px solid var(--line-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); padding: 10px 11px; }
+.research-form textarea { resize: vertical; }
+.research-form textarea:focus, .research-form input:focus, .research-form select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgb(38 115 88 / 12%); outline: 0; }
+.research-actions { display: flex; grid-column: 1 / -1; flex-wrap: wrap; gap: 8px; }
+.research-form .form-error { grid-column: 1 / -1; margin: 0; }
+.research-evidence { display: grid; gap: 10px; margin-top: 18px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface-soft); padding: 14px; }
+.research-evidence-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.research-evidence-heading h3 { margin: 0; font-size: 0.95rem; }
+.research-evidence-heading span { border-radius: 99px; background: var(--primary-soft); color: var(--primary-strong); padding: 4px 8px; font-size: 0.7rem; font-weight: 800; }
+.research-evidence ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.research-evidence li { border-top: 1px solid var(--line); padding-top: 10px; }
+.research-evidence li:first-child { border-top: 0; padding-top: 0; }
+.research-evidence p { margin: 5px 0 0; color: var(--ink-soft); font-size: 0.82rem; line-height: 1.45; }
+.research-evidence p:first-of-type { color: var(--muted); font-size: 0.74rem; }
+.research-evidence [role="note"] { border-left: 3px solid var(--warning); background: #fff9e8; color: #6c4b00; padding: 9px 10px; }
 .compact-button { min-height: 38px; }
 .icon-button { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: inherit; font-size: 1.35rem; }
 .icon-button:hover { background: rgb(0 0 0 / 6%); }

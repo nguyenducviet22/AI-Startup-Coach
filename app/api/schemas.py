@@ -63,6 +63,42 @@ class ChatResponse(BaseModel):
     session_id: UUID
     message: str
     stage_readiness: StageReadinessResponse | None = None
+    research: "ResearchResponse | None" = None
+
+
+class ResearchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    query: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000)] | None = None
+    urls: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000)]] = Field(default_factory=list, max_length=5)
+    category: Literal["general", "news", "pricing", "legal"] = "general"
+    search_depth: Literal["basic", "advanced"] = "basic"
+    include_domains: list[Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=255)]] = Field(default_factory=list, max_length=20)
+    start_date: str | None = None
+    end_date: str | None = None
+    jurisdiction: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)] | None = None
+    force_refresh: bool = False
+    max_results: Annotated[int, Field(ge=1, le=20)] = 5
+    session_id: UUID | None = None
+
+
+class ResearchEvidenceResponse(BaseModel):
+    source_id: str
+    url: str
+    title: str
+    excerpt: str
+    retrieved_at: str
+    published_at: str | None
+    authority: str
+    legal_or_regulatory: bool
+
+
+class ResearchResponse(BaseModel):
+    evidence: list[ResearchEvidenceResponse]
+    cache_hit: bool
+    retrieved_at: str
+    served_at: str
+    legal_notice: str | None = None
 
 
 class ChatMessageResponse(BaseModel):

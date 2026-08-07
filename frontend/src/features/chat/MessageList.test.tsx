@@ -68,4 +68,17 @@ describe("MessageList", () => {
     expect(screen.getAllByRole("article")[1]).toHaveTextContent("Safe text");
     expect(screen.getAllByRole("article")[1]).toHaveTextContent("<img src=x onerror=alert(1)>");
   });
+
+  it("preserves citation links in assistant history and renders immediate research evidence", () => {
+    render(
+      <MessageList
+        isLoading={false}
+        messages={[{ role: "assistant", content: "Read [the source](https://example.com/history).", created_at: null, sequence: 1 }]}
+        research={{ evidence: [{ source_id: "source-1", url: "https://example.com/evidence", title: "Evidence source", excerpt: "Evidence excerpt", retrieved_at: "2026-08-07T00:00:00Z", published_at: null, authority: "official", legal_or_regulatory: false }], cache_hit: false, retrieved_at: "2026-08-07T00:00:00Z", served_at: "2026-08-07T00:00:00Z", legal_notice: null }}
+      />
+    );
+
+    expect(screen.getByRole("link", { name: "the source" })).toHaveAttribute("href", "https://example.com/history");
+    expect(screen.getByRole("link", { name: "Evidence source" })).toHaveAttribute("href", "https://example.com/evidence");
+  });
 });

@@ -23,7 +23,11 @@ export type ChatResponse = {
   session_id: string;
   message: string;
   stage_readiness: StageReadiness | null;
+  research?: ResearchResponse | null;
 };
+
+export type ResearchEvidence = { source_id: string; url: string; title: string; excerpt: string; retrieved_at: string; published_at: string | null; authority: string; legal_or_regulatory: boolean };
+export type ResearchResponse = { evidence: ResearchEvidence[]; cache_hit: boolean; retrieved_at: string; served_at: string; legal_notice: string | null };
 
 export async function getChatMessages(
   startupId: string,

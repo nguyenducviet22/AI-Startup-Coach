@@ -82,7 +82,8 @@ async def test_document_service_persists_long_funding_recommendation(
     recommendation = "Bootstrap validation first, then consider grants, competitions, accelerators, or pre-seed funding after demonstrating repeat usage and vendor willingness to pay."
 
     async with session_factory() as session:
-        document = await DocumentService(session).save_document(
+        service = DocumentService(session)
+        document = await service.save_document(
             startup_id=startup_id,
             doc_type="funding_guide",
             data={
@@ -91,9 +92,14 @@ async def test_document_service_persists_long_funding_recommendation(
                 "funding_stage_recommendation": recommendation,
             },
         )
+        history = await service.get_document_history(
+            startup_id=startup_id,
+            doc_type="funding_guide",
+        )
 
     assert document["content"]["funding_stage_recommendation"] == recommendation
-    assert [entry["is_current"] for entry in history] == [True, False]
+    assert history[0]["content"]["funding_stage_recommendation"] == recommendation
+    assert [entry["is_current"] for entry in history] == [True]
 
 
 async def test_document_service_restores_old_content_as_a_new_current_version(

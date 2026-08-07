@@ -36,6 +36,7 @@ build-backend = "hatchling.build"
 packages = ["app"]
 
 [tool.pytest.ini_options]
+addopts = "--basetemp=.tmp/pytest-basetemp"
 asyncio_mode = "auto"
 testpaths = ["tests"]
 

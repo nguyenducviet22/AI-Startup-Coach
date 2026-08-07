@@ -3,12 +3,14 @@ from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import (
     get_chat_client,
     get_chat_research_provider,
     get_local_user,
+    get_research_provider,
     require_startup_owner,
 )
 from app.api.schemas import (
@@ -21,6 +23,8 @@ from app.api.schemas import (
     ChatRequest,
     ChatMessagesResponse,
     ChatResponse,
+    ResearchRequest as ApiResearchRequest,
+    ResearchResponse,
     CreateStartupRequest,
     DocumentHistoryResponse,
     DocumentResponse,
@@ -55,7 +59,9 @@ from app.services.agentops.instrumented_research_service import InstrumentedRese
 from app.services.agentops.instrumented_tool_dispatcher import InstrumentedToolDispatcher
 from app.services.orchestrator import AgentOrchestrator
 from app.services.research_prompt import ResearchSkillLoader
-from app.services.research_service import ResearchService
+from app.services.research_response_policy import apply_research_response_policy
+from app.services.research_service import ResearchOwnerContext, ResearchService
+from app.services.research_errors import ResearchServiceError
 from app.services.skill_loader import SkillLoader
 from app.services.tool_dispatcher import ResearchExecutionContext
 from app.services.stage_service import AlreadyCompletedError, StageService
@@ -69,6 +75,7 @@ from app.services.startup_overview_service import StartupOverviewService
 from app.services.startup_report_service import ReportSectionSelectionError, StartupReportService
 from app.services.tool_dispatcher import ToolDispatcher
 from app.research.protocol import ResearchProvider
+from app.research.schemas import ResearchRequest
 
 router = APIRouter()
 
@@ -336,6 +343,8 @@ async def chat(
             user_message=request.message,
             current_document=current_document,
         )
+        policy_result = apply_research_response_policy(result.content, result.tool_call_data)
+        result = result.__class__(content=policy_result.content, stage_readiness=result.stage_readiness, tool_messages=result.tool_messages, tool_call_data=result.tool_call_data)
 
         await chat_service.save_message(
             session_id=chat_session.id,
@@ -366,7 +375,49 @@ async def chat(
         "session_id": chat_session.id,
         "message": result.content,
         "stage_readiness": result.stage_readiness,
+        "research": policy_result.research,
     }
+
+
+@router.post("/startups/{startup_id}/research", response_model=ResearchResponse)
+async def research(
+    startup: Annotated[Startup, Depends(require_startup_owner)],
+    request: ApiResearchRequest,
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    provider: Annotated[ResearchProvider, Depends(get_research_provider)],
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> dict[str, Any]:
+    try:
+        research_request = ResearchRequest(**request.model_dump(exclude={"session_id"}))
+    except ValidationError as exc:
+        error = exc.errors()[0]
+        field = ".".join(str(part) for part in error.get("loc", ("research",)))
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail={
+                "field": field,
+                "code": "research_request_invalid",
+                "message": error["msg"],
+            },
+        ) from exc
+
+    chat_service = ChatService(session)
+    try:
+        chat_session = await chat_service.get_or_create_session(startup_id=startup.id, session_id=request.session_id)
+        service = InstrumentedResearchService(
+            wrapped=ResearchService(session, provider, settings), turn_id=None, startup_id=startup.id,
+            user_id=startup.user_id, session_id=chat_session.id, stage=startup.current_stage,
+        )
+        outcome = await service.execute(
+            owner=ResearchOwnerContext(startup_id=startup.id, user_id=startup.user_id, session_id=chat_session.id),
+            request=research_request,
+        )
+    except ResearchServiceError as exc:
+        status_code = status.HTTP_429_TOO_MANY_REQUESTS if exc.detail.code == "research_rate_limited" else status.HTTP_503_SERVICE_UNAVAILABLE
+        raise HTTPException(status_code=status_code, detail=exc.detail.to_dict()) from exc
+    result = outcome.result.model_dump(mode="json")
+    notice = result.get("legal_notice")
+    return {**result, "legal_notice": notice.get("message") if isinstance(notice, dict) else None}
 
 
 @router.get("/startups/{startup_id}/chat/messages", response_model=ChatMessagesResponse)

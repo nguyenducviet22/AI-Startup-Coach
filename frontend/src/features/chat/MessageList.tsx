@@ -1,14 +1,16 @@
-import type { ChatMessage } from "../../api/chat";
+import type { ChatMessage, ResearchResponse } from "../../api/chat";
 import { Skeleton } from "../../components/Skeleton";
+import { ResearchEvidence } from "../research/ResearchEvidence";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 type MessageListProps = {
   messages: ChatMessage[];
   isLoading: boolean;
+  research?: ResearchResponse | null;
 };
 
-export function MessageList({ messages, isLoading }: MessageListProps) {
+export function MessageList({ messages, isLoading, research = null }: MessageListProps) {
   if (isLoading) {
     return <Skeleton lines={4} />;
   }
@@ -37,6 +39,7 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
           )}
         </article>
       ))}
+      {research ? <ResearchEvidence research={research} /> : null}
     </div>
   );
 }

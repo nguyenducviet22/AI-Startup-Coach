@@ -146,6 +146,8 @@ def _settings() -> Settings:
         LLM_PROXY_API_KEY="proxy-test-key",
         LLM_PROXY_BASE_URL="https://9router.test/v1",
         LLM_PROXY_MODEL="openai/gpt-4o-mini",
+        # Pin the effective client model so a developer's .env cannot override this fixture.
+        LLM_MODEL="openai/gpt-4o-mini",
         OPENROUTER_HTTP_REFERER="http://localhost:8000",
         OPENROUTER_X_TITLE="AI Startup Coach",
         CHAT_HISTORY_LIMIT=20,

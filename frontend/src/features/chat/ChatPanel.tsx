@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   getChatMessages,
   sendChatMessage,
+  type ResearchResponse,
   type StageReadiness
 } from "../../api/chat";
 import type { StageName } from "../../api/startups";
@@ -12,6 +13,7 @@ import { useWorkspacePreferencesStore } from "../../stores/workspacePreferencesS
 import { MessageList } from "./MessageList";
 import { StageReadinessPrompt } from "./StageReadinessPrompt";
 import { useToastStore } from "../../stores/toastStore";
+import { ResearchPanel } from "../research/ResearchPanel";
 
 type ChatPanelProps = {
   startupId: string;
@@ -37,6 +39,7 @@ export function ChatPanel({
   const draft = useWorkspacePreferencesStore((state) => state.workspaces[startupId]?.chatDraft ?? "");
   const updateWorkspace = useWorkspacePreferencesStore((state) => state.updateWorkspace);
   const [readiness, setReadiness] = useState<StageReadiness | null>(null);
+  const [research, setResearch] = useState<ResearchResponse | null>(null);
   const showToast = useToastStore((state) => state.showToast);
   const isCompleted = currentStage === "completed";
 
@@ -54,6 +57,7 @@ export function ChatPanel({
     onSuccess(response) {
       setSessionId(startupId, response.session_id);
       setReadiness(response.stage_readiness);
+      setResearch(response.research ?? null);
       void queryClient.invalidateQueries({ queryKey: ["chat-messages", startupId, response.session_id] });
       void queryClient.invalidateQueries({ queryKey: ["document", startupId] });
       void queryClient.invalidateQueries({ queryKey: ["document-history", startupId] });
@@ -93,7 +97,7 @@ export function ChatPanel({
         ) : null}
       </div>
 
-      <MessageList messages={messages} isLoading={historyQuery.isLoading} />
+      <MessageList messages={messages} isLoading={historyQuery.isLoading} research={research} />
 
       {isCompleted ? (
         <div className="completion-summary">
@@ -126,6 +130,8 @@ export function ChatPanel({
           </form>
         </>
       )}
+
+      <ResearchPanel startupId={startupId} sessionId={sessionId} />
     </section>
   );
 }

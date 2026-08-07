@@ -222,4 +222,18 @@ describe("ChatPanel", () => {
     expect(screen.getAllByText("Repeat this")).toHaveLength(2);
     expect(screen.getAllByText("Same reply")).toHaveLength(2);
   });
+
+  it("renders structured evidence returned by a chat research turn", async () => {
+    const user = userEvent.setup();
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonResponse({ session_id: null, messages: [] }))
+      .mockResolvedValueOnce(jsonResponse({ session_id: "session-1", message: "Evidence [source-1].", stage_readiness: null, research: { evidence: [{ source_id: "source-1", url: "https://example.com/source", title: "Research source", excerpt: "Evidence", retrieved_at: "2026-08-07T00:00:00Z", published_at: null, authority: "official", legal_or_regulatory: false }], cache_hit: false, retrieved_at: "2026-08-07T00:00:00Z", served_at: "2026-08-07T00:00:00Z", legal_notice: null } }))
+      .mockResolvedValueOnce(jsonResponse({ session_id: "session-1", messages: [{ role: "assistant", content: "Evidence [source-1].", created_at: null, sequence: 1 }] }));
+
+    renderWithQueryClient(<ChatPanel startupId="startup-1" currentStage="idea" onAdvanceStage={vi.fn()} />);
+    await user.type(await screen.findByLabelText("Message"), "Research this");
+    await user.click(screen.getByRole("button", { name: "Send message" }));
+
+    expect(await screen.findByRole("link", { name: "Research source" })).toBeInTheDocument();
+  });
 });

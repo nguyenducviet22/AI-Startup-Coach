@@ -5,6 +5,7 @@ evals/artifacts/
 # Python
 .venv/
 venv/
+node_modules/
 __pycache__/
 **/__pycache__/
 .pytest_cache/
