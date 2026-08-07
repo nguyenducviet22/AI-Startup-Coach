@@ -97,6 +97,7 @@ async def client(session_factory, postgres_url, monkeypatch):
             yield session
 
     monkeypatch.setenv("DATABASE_URL", postgres_url)
+    monkeypatch.setenv("JWT_SECRET", "research-route-test-secret-with-at-least-thirty-two-bytes")
     get_settings.cache_clear()
     db_session._engine = None
     db_session._session_local = None

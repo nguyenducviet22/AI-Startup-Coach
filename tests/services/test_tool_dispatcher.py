@@ -1,6 +1,7 @@
 import uuid
 from datetime import UTC, datetime
 
+from app.core.config import Settings
 from app.research.schemas import EvidenceAuthority, EvidenceRecord, LegalNotice, ResearchResult
 from app.services.research_errors import ResearchErrorDetail, ResearchServiceError
 from app.services.research_service import ResearchAccountingOutcome, ResearchServiceResult
@@ -295,6 +296,10 @@ async def test_same_turn_research_and_document_batch_is_not_labeled_research_inf
         chat_client=BatchChatClient(),
         tool_dispatcher=BatchDispatcher(),  # type: ignore[arg-type]
         skill_loader=BatchSkillLoader(),  # type: ignore[arg-type]
+        settings=Settings(
+            _env_file=None,
+            JWT_SECRET="tool-dispatcher-test-secret-with-at-least-thirty-two-bytes",
+        ),
     ).handle_turn(
         startup=StartupContext("startup", "user", "lean_canvas"),
         history=[],
