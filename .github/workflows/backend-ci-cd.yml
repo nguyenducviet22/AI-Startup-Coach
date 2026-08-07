@@ -124,7 +124,33 @@ jobs:
           sarif_file="$(find codeql-results -type f -name '*.sarif' -print -quit)"
           test -n "$sarif_file" || { echo "CodeQL did not produce a SARIF file."; exit 1; }
           # CodeQL security-severity bands define HIGH/CRITICAL as 7.0 and above.
-          high_critical_count="$(jq '[.runs[] as $run | $run.results[] as $result | ($run.tool.driver.rules[$result.ruleIndex].properties["security-severity"] // "0" | tonumber) | select(. >= 7)] | length' "$sarif_file")"
+          high_critical_count="$(
+            jq '
+              [
+                (.runs? // [])[]?
+                | select(type == "object")
+                | . as $run
+                | (try $run.tool.driver.rules catch []) as $candidate_rules
+                | (if ($candidate_rules | type) == "array" then $candidate_rules else [] end) as $rules
+                | (if ($run.results? | type) == "array" then $run.results else [] end)[]?
+                | select(type == "object")
+                | . as $result
+                | (try $result.ruleIndex catch null) as $rule_index
+                | (try $result.ruleId catch null) as $rule_id
+                | (
+                    if ($rule_index | type) == "number" then $rules[$rule_index]?
+                    elif ($rule_id | type) == "string" then
+                      ($rules | map(select((try .id catch null) == $rule_id)) | .[0])
+                    else null
+                    end
+                  ) as $rule
+                | (try $rule.properties["security-severity"] catch "0") as $severity
+                | (($severity // "0") | tonumber? // 0)
+                | select(. >= 7)
+              ]
+              | length
+            ' "$sarif_file"
+          )"
           test "$high_critical_count" -eq 0 || { echo "CodeQL found $high_critical_count HIGH/CRITICAL finding(s)."; exit 1; }
 
   trivy:
