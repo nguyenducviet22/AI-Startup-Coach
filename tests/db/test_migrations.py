@@ -226,6 +226,73 @@ def test_alembic_upgrade_head_creates_auth_agentops_and_research_tables(monkeypa
             assert "sequence" in identity_columns_by_table[table_name]
 
 
+def test_alembic_downgrade_removes_research_tables_indexes_and_constraints(monkeypatch) -> None:
+    with PostgresContainer("postgres:16-alpine") as postgres:
+        async_url = _asyncpg_url(postgres.get_connection_url())
+        monkeypatch.setenv("DATABASE_URL", async_url)
+        monkeypatch.setenv("JWT_SECRET", "migration-test-secret-with-at-least-thirty-two-bytes")
+        get_settings.cache_clear()
+
+        alembic_config = Config(str(ROOT_DIR / "alembic.ini"))
+        command.upgrade(alembic_config, "head")
+        command.downgrade(alembic_config, "20260801_0004")
+
+        try:
+            table_names, indexes, foreign_keys, unique_constraints = asyncio.run(
+                _inspect_research_artifacts(async_url)
+            )
+        finally:
+            get_settings.cache_clear()
+
+        research_tables = {
+            "research_calls",
+            "research_cache_entries",
+            "research_quota_reservations",
+        }
+        assert research_tables.isdisjoint(table_names)
+        assert indexes == set()
+        assert foreign_keys == set()
+        assert unique_constraints == set()
+
+
+async def _inspect_research_artifacts(
+    url: str,
+) -> tuple[set[str], set[str], set[str], set[str]]:
+    engine = create_async_engine(url)
+    try:
+        async with engine.connect() as connection:
+            return await connection.run_sync(_inspect_research_artifacts_sync)
+    finally:
+        await engine.dispose()
+
+
+def _inspect_research_artifacts_sync(connection) -> tuple[set[str], set[str], set[str], set[str]]:
+    inspector = inspect(connection)
+    research_tables = {
+        "research_calls",
+        "research_cache_entries",
+        "research_quota_reservations",
+    }
+    table_names = set(inspector.get_table_names())
+    existing_research_tables = research_tables.intersection(table_names)
+    indexes = {
+        index["name"]
+        for table_name in existing_research_tables
+        for index in inspector.get_indexes(table_name)
+    }
+    foreign_keys = {
+        foreign_key["name"]
+        for table_name in existing_research_tables
+        for foreign_key in inspector.get_foreign_keys(table_name)
+    }
+    unique_constraints = {
+        constraint["name"]
+        for table_name in existing_research_tables
+        for constraint in inspector.get_unique_constraints(table_name)
+    }
+    return table_names, indexes, foreign_keys, unique_constraints
+
+
 async def _inspect_schema(
     url: str,
 ) -> tuple[

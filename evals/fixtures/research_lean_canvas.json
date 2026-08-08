@@ -1,0 +1,109 @@
+{
+  "case_id": "research_lean_canvas",
+  "stage": "lean_canvas",
+  "startup": {
+    "startup_id": "eval-startup-research-lean-canvas",
+    "user_id": "eval-user",
+    "name": "TutorOS"
+  },
+  "history": [],
+  "student_messages": [
+    "Research whether tutoring centers spend time on manual scheduling before we draft the Lean Canvas.",
+    "Using the research we just reviewed, draft the Lean Canvas."
+  ],
+  "research_evidence": [
+    {
+      "source_id": "source-tutoring-market",
+      "url": "https://example.org/tutoring-operations-study",
+      "title": "Tutoring Operations Study",
+      "excerpt": "Tutoring centers report substantial administrative work for scheduling and reminders.",
+      "retrieved_at": "2026-08-08T00:00:00Z",
+      "published_at": null,
+      "authority": "secondary",
+      "legal_or_regulatory": false
+    }
+  ],
+  "llm_responses": [
+    {
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-research",
+          "name": "research_web",
+          "arguments": {
+            "query": "tutoring centers manual scheduling administrative workload",
+            "category": "general",
+            "search_depth": "basic",
+            "max_results": 5
+          }
+        }
+      ]
+    },
+    {
+      "content": "The evidence shows scheduling administration is a real operational burden. [source-tutoring-market]"
+    },
+    {
+      "content": null,
+      "tool_calls": [
+        {
+          "id": "call-research-canvas",
+          "name": "generate_lean_canvas",
+          "arguments": {
+            "problem": "Tutoring centers lose time coordinating schedules, reminders, and lesson follow-ups.",
+            "solution": "Automated scheduling, reminder, and follow-up workflows for tutoring teams.",
+            "unique_value_proposition": "Less administrative work for tutoring centers without changing how tutors teach.",
+            "customer_segments": "Independent tutoring centers and small after-school programs.",
+            "channels": "Tutor owner communities and education operations newsletters."
+          }
+        },
+        {
+          "id": "call-lean-canvas-readiness",
+          "name": "check_stage_readiness",
+          "arguments": {
+            "current_stage": "lean_canvas",
+            "ready": false,
+            "missing_fields": ["revenue_streams"]
+          }
+        }
+      ]
+    },
+    {
+      "content": "I drafted the Lean Canvas using the scheduling-workload evidence. [source-tutoring-market]"
+    }
+  ],
+  "expected": {
+    "turns": [
+      {
+        "tool_calls": [
+          {
+            "tool_name": "research_web",
+            "required_fields": []
+          }
+        ],
+        "stage_readiness": null
+      },
+      {
+        "tool_calls": [
+          {
+            "tool_name": "generate_lean_canvas",
+            "required_fields": ["problem", "solution", "unique_value_proposition", "customer_segments"]
+          },
+          {
+            "tool_name": "check_stage_readiness",
+            "required_fields": ["current_stage", "ready", "missing_fields"]
+          }
+        ],
+        "stage_readiness": {
+          "ready": false,
+          "missing_fields": ["revenue_streams"]
+        }
+      }
+    ],
+    "research_grounding": {
+      "research_turn": 0,
+      "generation_turn": 1,
+      "source_ids": ["source-tutoring-market"]
+    },
+    "no_stage_auto_advance": true
+  }
+}

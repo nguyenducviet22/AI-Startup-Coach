@@ -48,3 +48,16 @@ def test_retrieved_at_is_preserved_from_the_tool_result() -> None:
     result = apply_research_response_policy("Evidence supports this [source-1].", tool_data)
 
     assert result.research["evidence"][0]["retrieved_at"] == "2026-08-07T00:00:00+00:00"
+
+
+def test_later_turn_accepts_citation_from_prior_session_research() -> None:
+    content = "The evidence supports prioritizing scheduling automation [source-1]."
+
+    result = apply_research_response_policy(
+        content,
+        [],
+        prior_tool_call_data=_tool_data(),
+    )
+
+    assert result.content == content
+    assert result.research is None

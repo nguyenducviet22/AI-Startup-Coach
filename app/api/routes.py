@@ -343,7 +343,14 @@ async def chat(
             user_message=request.message,
             current_document=current_document,
         )
-        policy_result = apply_research_response_policy(result.content, result.tool_call_data)
+        prior_research_tool_call_data = await chat_service.get_session_research_tool_call_data(
+            session_id=chat_session.id,
+        )
+        policy_result = apply_research_response_policy(
+            result.content,
+            result.tool_call_data,
+            prior_tool_call_data=prior_research_tool_call_data,
+        )
         result = result.__class__(content=policy_result.content, stage_readiness=result.stage_readiness, tool_messages=result.tool_messages, tool_call_data=result.tool_call_data)
 
         await chat_service.save_message(
