@@ -603,6 +603,9 @@ def test_research_infrastructure_error_codes_match_provider_failure_contract() -
     assert "code=error.code" in source
     assert provider_error_codes == infrastructure_codes | non_infrastructure_codes
     assert research_errors.PROVIDER_INFRASTRUCTURE_ERROR_CODES == infrastructure_codes
+    assert research_errors.PROVIDER_ATTEMPT_ERROR_CODES == infrastructure_codes | {
+        "provider_request_rejected",
+    }
     assert (
         alerting_service.RESEARCH_INFRASTRUCTURE_ERROR_CODES
         == research_errors.PROVIDER_INFRASTRUCTURE_ERROR_CODES

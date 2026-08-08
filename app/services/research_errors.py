@@ -18,6 +18,13 @@ PROVIDER_INFRASTRUCTURE_ERROR_CODES = frozenset(
     }
 )
 
+# These codes mean the provider received (or an attempt was made to send) a
+# request.  Local configuration failures occur before that boundary and must
+# not be recorded as provider attempts.
+PROVIDER_ATTEMPT_ERROR_CODES = PROVIDER_INFRASTRUCTURE_ERROR_CODES | {
+    "provider_request_rejected",
+}
+
 
 @dataclass(frozen=True)
 class ResearchErrorDetail:
