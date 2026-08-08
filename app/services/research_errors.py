@@ -6,6 +6,19 @@ from datetime import datetime
 from app.research.errors import ResearchProviderError
 
 
+# These provider failures are transient/provider-originated conditions that
+# contribute to AgentOps research_error_rate. Configuration, validation, quota,
+# and provider request-rejection errors intentionally do not belong here.
+PROVIDER_INFRASTRUCTURE_ERROR_CODES = frozenset(
+    {
+        "provider_timeout",
+        "provider_rate_limited",
+        "provider_unavailable",
+        "provider_malformed_response",
+    }
+)
+
+
 @dataclass(frozen=True)
 class ResearchErrorDetail:
     field: str | None
