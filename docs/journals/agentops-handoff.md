@@ -114,6 +114,17 @@ the `/chat` route response shape stay unchanged.
 - **Eval runner is source-tree tooling.** Run it from a checkout with
   `python -m evals.run`; it is intentionally not included in the installed app
   wheel.
+- **Research Agent cross-turn citation freshness is unbounded.**
+  `ChatService.get_session_research_tool_call_data()` permits a founder to cite
+  evidence from any earlier assistant turn in the same long-running chat
+  session. This is independent of `ResearchCacheEntry.expires_at`: cache TTL
+  determines whether a *new* provider request can reuse a cached result, not
+  whether already-surfaced evidence remains citable. This leaves a real gap
+  against the category-sensitive freshness intent for news/current events,
+  competitor pricing, and legal/regulatory research: week-old legal or pricing
+  evidence is currently accepted without a staleness warning. Future scope:
+  either enforce a maximum citation age for freshness-sensitive categories or
+  visibly mark old cross-turn evidence as potentially outdated.
 
 ---
 

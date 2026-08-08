@@ -136,6 +136,26 @@ class ChatService:
         rows = list(reversed(result.scalars().all()))
         return [_message_to_context(row) for row in rows]
 
+    async def get_session_research_tool_call_data(
+        self,
+        *,
+        session_id: uuid.UUID | str,
+    ) -> list[dict[str, Any]]:
+        """Return persisted research results from prior assistant turns in this session only."""
+        result = await self.session.execute(
+            select(ChatMessage.tool_call_data)
+            .where(
+                ChatMessage.session_id == _coerce_uuid(session_id),
+                ChatMessage.role == "assistant",
+            )
+            .order_by(ChatMessage.sequence)
+        )
+        entries: list[dict[str, Any]] = []
+        for tool_call_data in result.scalars():
+            if isinstance(tool_call_data, list):
+                entries.extend(item for item in tool_call_data if isinstance(item, dict))
+        return entries
+
     async def get_display_messages(
         self,
         *,

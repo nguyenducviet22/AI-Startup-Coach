@@ -370,6 +370,30 @@ async def test_chat_route_records_recovered_llm_error_as_successful_turn(
     assert llm_call.error_code == "LLMProviderError"
 
 
+async def test_chat_route_keeps_non_research_response_shape_unchanged(
+    client: httpx.AsyncClient,
+    session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    user_id = await _create_user(session_factory)
+    startup_id = await _create_startup(session_factory, user_id)
+    client.fake_chat_client.responses = [_response("Let us clarify the problem first.")]
+
+    response = await client.post(
+        f"/startups/{startup_id}/chat",
+        json={"message": "Help me shape the idea."},
+        headers=_auth_headers(user_id),
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload == {
+        "session_id": payload["session_id"],
+        "message": "Let us clarify the problem first.",
+        "stage_readiness": None,
+        "research": None,
+    }
+
+
 async def test_chat_route_records_escaped_exception_as_error_turn(
     client: httpx.AsyncClient,
     session_factory: async_sessionmaker[AsyncSession],

@@ -321,3 +321,90 @@ async def test_chat_route_research_call_still_gets_a_real_turn_id(client, sessio
         ).scalar_one()
     assert call.turn_id is not None
     assert call.turn_id == turn.id
+
+
+async def test_chat_route_accepts_later_turn_citation_from_same_session_research(
+    client, session_factory
+):
+    class Chat:
+        def __init__(self) -> None:
+            self.responses = [
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": "research",
+                                        "function": {
+                                            "name": "research_web",
+                                            "arguments": '{"query": "tutoring scheduling"}',
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                },
+                {"choices": [{"message": {"content": "Evidence [source-1].", "tool_calls": []}}]},
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": None,
+                                "tool_calls": [
+                                    {
+                                        "id": "canvas",
+                                        "function": {
+                                            "name": "generate_lean_canvas",
+                                            "arguments": (
+                                                '{"problem":"Manual scheduling","solution":"Automation",'
+                                                '"unique_value_proposition":"Less admin",'
+                                                '"customer_segments":"Tutoring centers"}'
+                                            ),
+                                        },
+                                    }
+                                ],
+                            }
+                        }
+                    ]
+                },
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": "The canvas uses the scheduling evidence [source-1].",
+                                "tool_calls": [],
+                            }
+                        }
+                    ]
+                },
+            ]
+
+        async def create_chat_completion(self, **kwargs):
+            return self.responses.pop(0)
+
+    chat_client = Chat()
+    app.dependency_overrides[get_chat_client] = lambda: chat_client
+    user = await _user(session_factory)
+    startup = await _startup(session_factory, user)
+    first = await client.post(
+        f"/startups/{startup}/chat", json={"message": "Research scheduling."}, headers=_headers(user)
+    )
+    assert first.status_code == 200
+
+    async with session_factory() as session:
+        startup_row = await session.get(Startup, startup)
+        assert startup_row is not None
+        startup_row.current_stage = "lean_canvas"
+        await session.commit()
+
+    second = await client.post(
+        f"/startups/{startup}/chat",
+        json={"message": "Draft the Lean Canvas using that research.", "session_id": first.json()["session_id"]},
+        headers=_headers(user),
+    )
+
+    assert second.status_code == 200
+    assert second.json()["message"] == "The canvas uses the scheduling evidence [source-1]."
