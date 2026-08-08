@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
+from typing import get_args
 
 import pytest
 from alembic import command
@@ -17,15 +18,19 @@ from app.core.config import ROOT_DIR, Settings, get_settings
 from app.db import session as db_session
 from app.models.agentops import AgentTurn, AlertEvent, LlmCall, ToolCallLog
 from app.models.chat import ChatSession
+from app.models.research import ResearchCall
 from app.models.startup import Startup
 from app.models.user import User
 from app.services.agentops import pricing
+from app.services.agentops import alerting_service
 from app.services.agentops.alerting_service import evaluate_error_rate
 from app.services.agentops.instrumented_tool_dispatcher import InstrumentedToolDispatcher
 from app.services.agentops.llm_metrics_service import record_llm_call
 from app.services.agentops.tool_metrics_service import record_tool_call
 from app.services.agentops.turn_metrics_service import finish_turn, start_turn
 from app.services.tool_dispatcher import ToolDispatcher
+from app.services import research_errors
+from app.research.errors import ProviderErrorCode
 
 
 @pytest.fixture(scope="module")
@@ -427,6 +432,104 @@ async def test_error_rate_zero_volume_returns_not_enough_data_without_alert(
     assert alert_count == 0
 
 
+async def test_non_research_error_rate_requires_explicit_threshold_and_window() -> None:
+    with pytest.raises(ValueError, match="required for non-research"):
+        await evaluate_error_rate(metric_name="llm_error_rate", scope=None)
+
+
+async def test_research_error_rate_zero_volume_returns_not_enough_data_without_alert(
+    agentops_database: str,
+) -> None:
+    now = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
+
+    result = await evaluate_error_rate(
+        metric_name="research_error_rate",
+        scope=None,
+        window_seconds=60,
+        threshold=Decimal("0.5"),
+        now=now,
+    )
+
+    assert result.total_count == 0
+    assert result.error_count == 0
+    assert result.observed_value is None
+    assert result.alert_inserted is False
+    assert result.reason == "not_enough_data"
+
+
+async def test_stage_scoped_research_error_rate_counts_only_requested_stage(
+    agentops_database: str,
+) -> None:
+    now = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
+    startup_id, _ = await _create_startup_and_session()
+    await _insert_research_call(
+        startup_id=startup_id,
+        stage="swot",
+        status="error",
+        error_code="provider_timeout",
+        provider_call_made=True,
+        cache_hit=False,
+        created_at=now - timedelta(seconds=5),
+    )
+    await _insert_research_call(
+        startup_id=startup_id,
+        stage="bmc",
+        status="error",
+        error_code="provider_unavailable",
+        provider_call_made=True,
+        cache_hit=False,
+        created_at=now - timedelta(seconds=5),
+    )
+
+    result = await evaluate_error_rate(
+        metric_name="research_error_rate",
+        scope="swot",
+        window_seconds=60,
+        threshold=Decimal("1"),
+        now=now,
+    )
+
+    assert result.total_count == 1
+    assert result.error_count == 1
+    assert result.observed_value == Decimal("1")
+    assert result.alert_inserted is True
+
+
+async def test_research_error_rate_excludes_cache_validation_and_quota_rejections(
+    agentops_database: str,
+) -> None:
+    now = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
+    startup_id, _ = await _create_startup_and_session()
+    for status, error_code, provider_call_made, cache_hit in (
+        ("success", None, False, True),
+        ("error", "research_validation_error", False, False),
+        ("error", "research_rate_limited", False, False),
+        ("error", "provider_request_rejected", True, False),
+    ):
+        await _insert_research_call(
+            startup_id=startup_id,
+            stage="idea",
+            status=status,
+            error_code=error_code,
+            provider_call_made=provider_call_made,
+            cache_hit=cache_hit,
+            created_at=now - timedelta(seconds=5),
+        )
+
+    result = await evaluate_error_rate(
+        metric_name="research_error_rate",
+        scope="idea",
+        window_seconds=60,
+        threshold=Decimal("0.01"),
+        now=now,
+    )
+
+    assert result.total_count == 4
+    assert result.error_count == 0
+    assert result.observed_value == Decimal("0")
+    assert result.alert_inserted is False
+
+
 async def test_error_rate_window_includes_boundary_and_excludes_older_rows(
     agentops_database: str,
 ) -> None:
@@ -475,6 +578,35 @@ def test_agentops_pricing_setting_has_no_duplicate_app_fallback_default() -> Non
     ]
     assert app_references == [Path("app/core/config.py")]
     assert "AGENTOPS_PRICING_ENABLED" not in inspect.getsource(pricing)
+
+
+def test_research_infrastructure_error_codes_match_provider_failure_contract() -> None:
+    provider_error_codes = set(get_args(ProviderErrorCode))
+    source = inspect.getsource(research_errors.provider_failure)
+    infrastructure_codes = {
+        # Provider transport and response failures: retryable or not, they are
+        # service-health signals rather than founder/input/configuration errors.
+        "provider_timeout",
+        "provider_rate_limited",
+        "provider_unavailable",
+        "provider_malformed_response",
+    }
+    non_infrastructure_codes = {
+        # Caller/provider-request rejection and local configuration state do not
+        # measure provider availability and must not inflate this error rate.
+        "provider_request_rejected",
+        "provider_missing_key",
+        "research_disabled",
+        "research_misconfigured",
+    }
+
+    assert "code=error.code" in source
+    assert provider_error_codes == infrastructure_codes | non_infrastructure_codes
+    assert research_errors.PROVIDER_INFRASTRUCTURE_ERROR_CODES == infrastructure_codes
+    assert (
+        alerting_service.RESEARCH_INFRASTRUCTURE_ERROR_CODES
+        == research_errors.PROVIDER_INFRASTRUCTURE_ERROR_CODES
+    )
 
 
 async def _create_startup_and_session() -> tuple[uuid.UUID, uuid.UUID]:
@@ -553,6 +685,45 @@ async def _insert_tool_call(
                 latency_ms=10,
                 status=status,
                 error_type=None if status == "ok" else status,
+                created_at=created_at,
+            )
+        )
+        await session.commit()
+
+
+async def _insert_research_call(
+    *,
+    startup_id: uuid.UUID,
+    stage: str,
+    status: str,
+    error_code: str | None,
+    provider_call_made: bool,
+    cache_hit: bool,
+    created_at: datetime,
+) -> None:
+    async with db_session.get_session_local()() as session:
+        startup = await session.get(Startup, startup_id)
+        assert startup is not None
+        session.add(
+            ResearchCall(
+                startup_id=startup_id,
+                user_id=startup.user_id,
+                session_id=None,
+                stage=stage,
+                provider="tavily",
+                operation="search",
+                category="general",
+                query_fingerprint="test-fingerprint",
+                provider_request_id=None,
+                cache_hit=cache_hit,
+                provider_call_made=provider_call_made,
+                credits_reserved=None,
+                credits_charged=0,
+                cost_usd=None,
+                pricing_unknown=True,
+                latency_ms=10,
+                status=status,
+                error_code=error_code,
                 created_at=created_at,
             )
         )

@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 import uuid
 
@@ -18,6 +19,7 @@ from app.models.startup import Startup
 from app.models.user import User
 from app.research.schemas import EvidenceAuthority, EvidenceRecord, ResearchResult
 from app.services.agentops.instrumented_research_service import InstrumentedResearchService
+from app.services.agentops.pricing import get_research_cost
 from app.services.agentops.research_metrics_service import record_research_call
 from app.services.research_errors import ResearchErrorDetail, ResearchServiceError
 from app.services.research_service import ResearchAccountingOutcome, ResearchOwnerContext, ResearchServiceResult
@@ -61,7 +63,13 @@ class FakeMetricsSession:
 class FakeResearchService:
     def __init__(self, outcome: ResearchServiceResult | Exception) -> None:
         self.outcome = outcome
-        self.settings = SimpleNamespace(research_provider="fake")
+        self.settings = SimpleNamespace(
+            research_provider="tavily",
+            research_pricing_enabled=True,
+            tavily_basic_search_credits=1,
+            tavily_advanced_search_credits=2,
+            tavily_extract_credits_per_five_urls=1,
+        )
 
     async def execute(self, **kwargs) -> ResearchServiceResult:
         if isinstance(self.outcome, Exception):
@@ -135,6 +143,38 @@ async def test_instrumented_research_records_cache_hit_once_with_exact_turn_id(m
     assert records[0]["cache_hit"] is True
     assert records[0]["provider_call_made"] is False
     assert records[0]["credits_charged"] == 0
+    assert records[0]["cost_usd"] == Decimal("0.000000")
+    assert records[0]["pricing_unknown"] is False
+
+
+async def test_instrumented_research_records_actual_tavily_credit_cost(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import app.services.agentops.instrumented_research_service as instrumentation
+
+    records: list[dict] = []
+
+    async def record(**kwargs) -> None:
+        records.append(kwargs)
+
+    monkeypatch.setattr(instrumentation, "record_research_call", record)
+    startup_id = uuid.uuid4()
+    service = InstrumentedResearchService(
+        wrapped=FakeResearchService(_outcome()),  # type: ignore[arg-type]
+        turn_id=uuid.uuid4(),
+        startup_id=startup_id,
+        user_id=uuid.uuid4(),
+        session_id=None,
+        stage="idea",
+    )
+
+    await service.execute(
+        owner=ResearchOwnerContext(startup_id=startup_id, user_id=uuid.uuid4()),
+        request=ResearchRequest(query="market"),
+    )
+
+    assert records[0]["cost_usd"] == Decimal("0.008000")
+    assert records[0]["pricing_unknown"] is False
 
 
 async def test_instrumented_research_persists_cache_hit_with_identity_sequence(
@@ -234,3 +274,40 @@ async def test_instrumented_research_records_structured_failure_once(monkeypatch
     assert len(records) == 1
     assert records[0]["status"] == "error"
     assert records[0]["error_code"] == "provider_timeout"
+
+
+def test_tavily_research_pricing_uses_actual_credit_usage() -> None:
+    settings = SimpleNamespace(
+        research_pricing_enabled=True,
+        tavily_basic_search_credits=1,
+        tavily_advanced_search_credits=2,
+        tavily_extract_credits_per_five_urls=1,
+    )
+
+    assert get_research_cost("search_basic", 1, settings=settings) == (Decimal("0.008000"), False)
+    assert get_research_cost("search_advanced", 2, settings=settings) == (
+        Decimal("0.016000"),
+        False,
+    )
+    assert get_research_cost("extract", 2, extract_url_count=6, settings=settings) == (
+        Decimal("0.016000"),
+        False,
+    )
+
+
+def test_tavily_research_pricing_is_explicitly_unknown_when_disabled_or_unrecognized() -> None:
+    disabled_settings = SimpleNamespace(
+        research_pricing_enabled=False,
+        tavily_basic_search_credits=1,
+        tavily_advanced_search_credits=2,
+        tavily_extract_credits_per_five_urls=1,
+    )
+    enabled_settings = SimpleNamespace(
+        research_pricing_enabled=True,
+        tavily_basic_search_credits=1,
+        tavily_advanced_search_credits=2,
+        tavily_extract_credits_per_five_urls=1,
+    )
+
+    assert get_research_cost("search_basic", 1, settings=disabled_settings) == (None, True)
+    assert get_research_cost("unknown_operation", 1, settings=enabled_settings) == (None, True)

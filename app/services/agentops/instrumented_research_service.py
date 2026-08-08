@@ -6,9 +6,14 @@ import time
 import uuid
 
 from app.research.schemas import ResearchRequest
+from app.services.agentops.pricing import get_research_cost
 from app.services.agentops.research_metrics_service import record_research_call
 from app.services.research_errors import ResearchServiceError
-from app.services.research_service import ResearchOwnerContext, ResearchService, ResearchServiceResult
+from app.services.research_service import (
+    ResearchOwnerContext,
+    ResearchService,
+    ResearchServiceResult,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +76,12 @@ class InstrumentedResearchService:
         latency_ms: int,
     ) -> None:
         accounting = outcome.accounting
+        cost_usd, pricing_unknown = get_research_cost(
+            _pricing_operation(accounting.operation, request),
+            accounting.credits_charged,
+            extract_url_count=len(request.urls) if request.urls else None,
+            settings=self._wrapped.settings,
+        )
         await self._record(
             provider=accounting.provider,
             operation=accounting.operation,
@@ -81,8 +92,8 @@ class InstrumentedResearchService:
             provider_call_made=accounting.provider_call_made,
             credits_reserved=accounting.credits_reserved,
             credits_charged=accounting.credits_charged,
-            cost_usd=accounting.cost_usd,
-            pricing_unknown=accounting.pricing_unknown,
+            cost_usd=cost_usd,
+            pricing_unknown=pricing_unknown,
             latency_ms=latency_ms,
             status="success",
             error_code=None,
@@ -135,3 +146,9 @@ class InstrumentedResearchService:
 
 def _elapsed_ms(started_at: float) -> int:
     return max(0, round((time.perf_counter() - started_at) * 1000))
+
+
+def _pricing_operation(operation: str, request: ResearchRequest) -> str:
+    if operation == "search":
+        return f"search_{request.search_depth.value}"
+    return operation
