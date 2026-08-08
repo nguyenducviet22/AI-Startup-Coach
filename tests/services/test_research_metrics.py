@@ -274,6 +274,7 @@ async def test_instrumented_research_records_structured_failure_once(monkeypatch
     assert len(records) == 1
     assert records[0]["status"] == "error"
     assert records[0]["error_code"] == "provider_timeout"
+    assert records[0]["provider_call_made"] is True
 
 
 def test_tavily_research_pricing_uses_actual_credit_usage() -> None:

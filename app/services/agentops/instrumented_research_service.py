@@ -8,7 +8,7 @@ import uuid
 from app.research.schemas import ResearchRequest
 from app.services.agentops.pricing import get_research_cost
 from app.services.agentops.research_metrics_service import record_research_call
-from app.services.research_errors import ResearchServiceError
+from app.services.research_errors import PROVIDER_ATTEMPT_ERROR_CODES, ResearchServiceError
 from app.services.research_service import (
     ResearchOwnerContext,
     ResearchService,
@@ -116,7 +116,7 @@ class InstrumentedResearchService:
             query_fingerprint=hashlib.sha256(subject.encode("utf-8")).hexdigest(),
             provider_request_id=None,
             cache_hit=False,
-            provider_call_made=False,
+            provider_call_made=error_code in PROVIDER_ATTEMPT_ERROR_CODES,
             credits_reserved=None,
             credits_charged=0,
             cost_usd=None,
